@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 365469ce91e37b14ab0e561bc7784206, type: 3}
+  m_Name: "\u88AB\u76D7"
+  m_EditorClassIdentifier: 
+  eventName: "\u88AB\u76D7"
+  description: "\u4F60\u88AB\u5C0F\u5077\u5149\u987E\u4E86\uFF01"
+  effectType: 0
+  cashChange: -200
+  reputationChange: 0
+  skipNextTurn: 0
+  effectDescription: "\u73B0\u91D1 -200"

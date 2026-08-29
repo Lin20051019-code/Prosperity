@@ -13,7 +13,7 @@
       }
     },
     "cn.tuanjie.codely.bridge": {
-      "version": "1.0.76",
+      "version": "1.0.78",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -30,6 +30,14 @@
         "com.unity.nuget.newtonsoft-json": "3.2.1"
       },
       "hash": "76a5a7e54c24e8f428e43b5071892f60260beea2"
+    },
+    "com.tripo3d.unitybridge": {
+      "version": "file:C:/Users/Lin20/Downloads/Tripo3d_Unity_Bridge-latest/Tripo3d_Unity_Bridge",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.unity.modules.jsonserialize": "1.0.0"
+      }
     },
     "com.unity.2d.animation": {
       "version": "9.2.0",

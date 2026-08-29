@@ -30,6 +30,7 @@ namespace SheNicest.UI
 
         private void Start()
         {
+            AudioManager.Instance?.PlayMainMenuBGM();
             BindButtons();
             CloseAllPanels();
             InitSettings();
@@ -163,13 +164,14 @@ namespace SheNicest.UI
         {
             GameSettings.BGMVolume = value;
             GameSettings.Save();
-            AudioListener.volume = GameSettings.BGMVolume;
+            AudioManager.Instance?.SetBGMVolume(value);
         }
 
         private void OnSFXVolumeChanged(float value)
         {
             GameSettings.SFXVolume = value;
             GameSettings.Save();
+            AudioManager.Instance?.SetSFXVolume(value);
         }
 
         private void OnResolutionChanged(int index)
