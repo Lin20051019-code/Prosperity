@@ -105,6 +105,7 @@ InitTestScene*.unity*
 
 # --- 代码编辑器 / 智能体工作台本地文件 ---
 .workbuddy/
+push-to-github.ps1
 
 # --- 游戏构建产物（体积大且可重新生成）---
 [Gg]ame/[Bb]uild/
