@@ -1,7 +1,10 @@
-# SheNicest 团队 Git 协作指南
+# 繁荣 Prosperity 团队 Git 协作指南
 
-> 仓库地址：https://github.com/Lin20051019-code/SheNicest
+> 仓库地址：https://github.com/Lin20051019-code/Prosperity
 > 本地项目：`E:\project\SheNicest\unity\SheNicest`
+>
+> 说明：GitHub 仓库名是 `Prosperity`（纯英文，地址干净），本地文件夹仍叫 `SheNicest`，
+> C# 代码命名空间也仍是 `SheNicest.UI`。改名**不影响代码**，不用动。
 
 ---
 
@@ -20,7 +23,7 @@ E:\project\SheNicest\unity\SheNicest\push-to-github.ps1
 
 ### 第 2 步：把队友加为协作者
 
-1. 打开 https://github.com/Lin20051019-code/SheNicest
+1. 打开 https://github.com/Lin20051019-code/Prosperity
 2. 点顶部 **Settings**（设置）
 3. 左侧栏点 **Collaborators**（协作者）
 4. 点绿色按钮 **Add people**
@@ -51,12 +54,12 @@ E:\project\SheNicest\unity\SheNicest\push-to-github.ps1
 在想要存放项目的目录里右键 → **Open Git Bash here**，执行：
 
 ```bash
-git clone https://github.com/Lin20051019-code/SheNicest.git
+git clone https://github.com/Lin20051019-code/Prosperity.git
 ```
 
 克隆完成后，用 Unity Hub 打开里面的 `game` 文件夹。
 
-> **注意**：要打开的是 `SheNicest\game` 这一层（它才是 Unity 工程），不是 `SheNicest` 根目录。
+> **注意**：要打开的是 `Prosperity\game` 这一层（它才是 Unity 工程），不是 `Prosperity` 根目录。
 
 ### 3. 第一次打开会有点慢
 
@@ -173,10 +176,10 @@ GitHub 有两条硬限制：
 
 ### 7.1 改成私有仓库 —— 这一步就满足了全部要求
 
-1. 打开 https://github.com/Lin20051019-code/SheNicest
+1. 打开 https://github.com/Lin20051019-code/Prosperity
 2. 点右上角 **Settings**（是仓库的 Settings，不是账号的）
 3. 拉到页面**最底部**的 **Danger Zone** 红色区域
-4. 点 **Change repository visibility** → 选 **Make private** → 输入仓库名 `SheNicest` 确认
+4. 点 **Change repository visibility** → 选 **Make private** → 输入仓库名 `Prosperity` 确认
 
 改完后：
 
