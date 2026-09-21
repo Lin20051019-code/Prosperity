@@ -11,6 +11,10 @@ namespace SheNicest.UI
         [Header("基础信息")]
         public string eventName;
         [TextArea] public string description;
+        public string eventKey;   // v4.2 i18n：逻辑键（英文版CSV填中文事件名；显示用eventName）
+
+        /// <summary>事件逻辑键：英文版CSV用中文键驱动Custom效果，显示层用eventName</summary>
+        public string EventKey => string.IsNullOrEmpty(eventKey) ? eventName : eventKey;
 
         [Header("效果类型")]
         public PenaltyEffect effectType;

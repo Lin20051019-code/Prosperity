@@ -1,0 +1,9 @@
+﻿eventName,description,effectType,cashChange,reputationChange,skipNextTurn,effectDescription,flavorText,eventKey
+Lucky Draw,Win 400 cash,CashGain,400,0,false,Gain 400 cash,"Fortune smiles on someone from time to time. This time, it's you.",中奖
+Good Samaritan,Reputation +10,ReputationGain,0,10,false,Reputation +10,"You helped a stranger, and the city took notice. Kindness has a way of echoing.",助人为乐
+Transit Voucher,Free teleport to train station,Custom,0,0,false,Free teleport to train station,"The city offers a helping hand to those still on their way. Fast-forward to your destination.",交通补贴
+Hostile Takeover,Win a random government-owned plot,Custom,0,0,false,Gain a random government plot Level 1,"A brilliant business play just landed you a new piece of land. The market never saw it coming.",商战
+Road Repairs,Roll the dice again,Custom,0,0,false,Extra dice roll,"The road is open again. The city moves forward — and so do you. Have another roll.",道路修缮
+Alliance,You and a random player both gain reputation,ReputationGain,0,5,false,Both players +5 reputation,"Two separate paths converged by choice. Your reputations rise together.",结盟
+Inside Connection,Buy a random opponent's property at 85% market price,Custom,0,0,false,Buy opponent's property at 85% market value,"Someone opened a door for you. You walked in, and now you're shopping in someone else's territory.",人脉
+Renovation,Random one of your properties upgrades for free,Custom,0,0,false,One of your properties upgrades free,"A thoughtful renovation makes the old feel new again. The city gains one more beautiful building.",装修

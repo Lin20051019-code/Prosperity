@@ -1,0 +1,226 @@
+# I18n English strings (key,en)
+# 格式：key,英文值。中文值硬编码在代码中作为默认，英文从此字典查取。
+# 注意：值中不含逗号，含逗号的用引号包裹。
+# 2026-09-19 v2.0 补齐：新增 M套件/状态面板/基础UI/砍价场景/地块tooltip/人格名词条；
+# 数字口径更新为 v2.2（胜利线110、告警线90）；panel_train 去除 emoji（豆腐块风险）。
+
+# ===== 播报系统 =====
+broadcast_tutorial,The city's prosperity depends on its poorest resident. Don't let anyone go bankrupt — reach prosperity 110 for a collective victory!
+broadcast_prosperity_down,City prosperity {old} → {new} (▼{delta}) — land values dropping…
+broadcast_prosperity_up,City prosperity {old} → {new} (▲{delta}) — all city assets appreciating!
+broadcast_warning_below30,WARNING: Prosperity has fallen below 30! The city is on the brink — the poorest player's wealth is dragging everyone down!
+broadcast_warning_above90,PROSPERITY: Broke through 90! Just one step from collective victory (110) — don't let go!
+broadcast_phase_crisis,WARNING: The city has entered recession! Emergency measures activated: increased welfare & reduced disasters
+broadcast_phase_sprint,PROSPERITY: Economic boom! The city enters sprint mode — opportunities and risks abound
+broadcast_shortboard_alert,[WARNING] {player} is on the verge of bankruptcy — saving them saves everyone!
+
+# ===== v2.2 M套件（萧条经济）=====
+broadcast_crisis_fee_summary,[CRISIS] Municipal maintenance fee collected; inflation devoured {total} yuan in hoarded cash ({names})
+broadcast_crisis_fee_only,[CRISIS] The depression continues. Municipal maintenance fee: {amount} yuan per person
+broadcast_surcharge,[WARNING] {player}'s reputation is in tatters — boycotted by the people, maintenance fee DOUBLED!
+broadcast_sprint_dividend,[PROSPERITY] Economic boom — the whole city receives a 20 yuan dividend
+broadcast_rescue_denied,[RUMOR] Someone turned a blind eye to {player}'s plight…
+event_aid_skipped,[EVENT] The municipal coffers are full — no relief needed this round
+
+# ===== 交易播报 =====
+broadcast_deal_ok,[DEAL] {buyer} purchased plot {tile} for {price} yuan (market: {market} — negotiated {pct}% savings)
+broadcast_deal_high,[DEAL] {buyer} purchased plot {tile} for {price} yuan (above market price — overpaid…)
+broadcast_deal_fail,[DEAL] {buyer} and {seller} failed to negotiate. Rent paid: {rent} yuan
+broadcast_rep_change,[REPUTATION] {player} reputation {delta} ({card})
+broadcast_rent,[RENT] {payer} paid {rent} yuan rent to {owner}
+broadcast_buy,[DEAL] {player} purchased a building
+broadcast_upgrade,[DEAL] {player} upgraded building to level {level}
+broadcast_buy_gov,[DEAL] {player} purchased plot {tile} (subsidized price: {price} yuan)
+broadcast_upgrade_tile,[DEAL] {player} upgraded plot {tile} to level {level} (-{price} yuan)
+
+# ===== 破产播报 =====
+broadcast_bankrupt_warning,[WARNING] {player} is insolvent! Forced liquidation of assets…
+broadcast_bankrupt_sold,[WARNING] {player}'s property sold at forced auction for {price} yuan
+broadcast_bankrupt_survived,{player} survived the auction by selling {count} properties. Cash: {cash} yuan
+broadcast_bankrupt_out,[WARNING] {player} has gone bankrupt — the city has lost its last economic pillar…
+game_over_bankrupt_infamous,{player} went bankrupt — despised and abandoned, the city collapses… ALL PLAYERS LOSE!
+
+# ===== 人格槽播报 =====
+broadcast_persona_hint_charity,[RUMOR] There's an undercurrent in this city — someone has a compassionate heart and can't stand to see others suffer…
+broadcast_persona_hint_vampire,[RUMOR] There's an undercurrent in this city — someone is ruthlessly greedy and won't yield an inch at the negotiating table…
+broadcast_persona_hint_hoarder,[RUMOR] There's an undercurrent in this city — someone is addicted to acquiring land and can't walk past an empty lot…
+broadcast_persona_rescue,[DEAL] {rescuer} bought one of {poor}'s properties for {price} yuan — "Let me help you through this."
+broadcast_charity_event,[EVENT] Lending a Hand: {poor} received {amount} yuan in relief funds
+broadcast_charity_rich,[EVENT] Lending a Hand: {rich} is the wealthiest — 500 yuan
+broadcast_robin_event,[EVENT] Robin Hood strikes: {rich} was robbed of 500 yuan
+
+# ===== 人格槽名（救援/传闻播报中会出现）=====
+persona_hoarder,Land Tycoon
+persona_cashcow,Cash Cow
+persona_charity,Philanthropist
+persona_balanced,Balanced Merchant
+persona_vampire,Vampire
+
+# ===== 阶段/回合播报 =====
+broadcast_round,Round {round} begins
+broadcast_salary,{player} passed GO and collected {salary} yuan salary
+broadcast_border_open,[EVENT] Borders have reopened — double dice restored!
+broadcast_quiet,All is calm. Nothing happens.
+broadcast_earthquake,[EVENT] Earthquake: {count} properties downgraded
+broadcast_scandal,[EVENT] Scandal: {player} reputation -10 and "persuaded to donate" 300 yuan
+broadcast_traffic,[EVENT] {player} will skip next turn due to a traffic accident
+
+# ===== 城市状态面板（v2.0）=====
+status_phase_crisis,RECESSION
+status_phase_normal,NORMAL
+status_phase_sprint,BOOM
+status_rule_crisis,Maintenance fee −{fee}/turn
+status_rule_sprint,Dividend +20/turn
+status_shortboard,Weakest link: {name} ({wealth} wealth)
+
+# ===== 基础UI标签 =====
+ui_cash,Cash {value}
+ui_wealth,Wealth {value}
+ui_reputation,Reputation {value}
+ui_round_hud,Round {round}/{max}
+ui_prosperity,Prosperity {value}
+ui_your_turn,YOUR TURN
+ui_ai_turn,{name} is taking their turn…
+
+# ===== 砍价场景UI =====
+bargain_round_no,Round {n}
+bargain_seller_offer,Seller ({name}): {offer} yuan
+bargain_buyer_offer,Buyer ({name}): {offer} yuan
+bargain_role_buy,Buy
+bargain_role_sell,Sell
+bargain_option,Option {n}
+
+# ===== 地块tooltip =====
+tile_house,House
+tile_building,Building
+tile_penalty,Penalty
+tile_reward,Reward
+tile_event,Event
+tile_foundation,Foundation
+tile_train,Train Station
+tile_start,GO
+tile_gov_owned,Government-owned
+tile_owner_player,Player {n}
+tile_unowned,Unowned
+
+# ===== 建筑面板 =====
+panel_buy_title,Vacant Land (Level 0)
+panel_market_price,Market Price: {price} yuan
+panel_buy_cost,Purchase Cost: {price} yuan (Government Subsidy)
+panel_buy_btn,Buy ({price} yuan)
+panel_upgrade_cost,Upgrade Cost: {price} yuan → Level {level}
+panel_max_level,Max level reached (3)
+panel_owned_building,Level {level} Building ({owner})
+panel_upgrade_btn,Upgrade ({price} yuan)
+panel_maxed,Max Level
+panel_rent,Rent: {price} yuan
+panel_rent_l3,Rent: {price} yuan (Level 3 Double!)
+panel_rent_btn,Pay Rent ({price} yuan)
+panel_bargain_btn,Negotiate
+panel_skip_btn,Skip
+panel_train,Train Station
+panel_train_desc,Ride the train to another station
+panel_train_cost,Cost: {price} yuan
+panel_train_btn,Ride ({price} yuan)
+
+# ===== 结果页 =====
+result_success,[DEAL CLOSED] Price: {price} yuan
+result_fail,[NEGOTIATION FAILED] Rent will be paid
+result_confirm,Confirm
+
+# ===== 角色名 =====
+char_0,Lizzie
+char_1,Rothwell
+char_2,Ruth
+char_3,Xu Feng
+
+# ===== 人格卡名 =====
+card_0,Make a Friend
+card_1,Fair Trade
+card_2,Read the Buyer
+card_3,Squeeze Hard
+
+# ===== 卡牌面板标题 =====
+card_penalty,⚠ PENALTY ⚠
+card_event,◆ RANDOM EVENT ◆
+card_reward,★ REWARD ★
+
+# ===== 游戏结束 =====
+game_over_win,Prosperity reached 110 — ALL PLAYERS WIN!
+game_over_lose,Prosperity fell too low — ALL PLAYERS LOSE!
+game_over_bankrupt,{player} went bankrupt — the city collapses. ALL PLAYERS LOSE!
+game_over_rounds_end,Game Over — Final Results
+game_over_meh,Prosperity was mediocre. Game over.
+
+# ===== v2.2 i18n 接线补齐（2026-09-19 全量播报/UI）=====
+broadcast_rumor_combined,[RUMOR] The city murmurs — {hints} … who could it be?
+ui_semicolon,;
+broadcast_traffic_skip,{player}'s turn was skipped (traffic accident)
+ui_dice_result,{player} rolled {d1} + {d2} = {steps} steps
+ui_dice_single,You rolled {d1} + {d2} = {steps} steps
+ui_dice_double,Rolled {d1} and {d2} — moving {steps} steps!
+ui_road_repair,Road repaired: roll the dice again!
+ui_road_repair_ai,{player} found the road under repair — roll again!
+ui_event_penalty,{player} triggered a penalty: {name} — {desc}
+ui_event_global,Global event: {name} — {desc}
+ui_event_reward,{player} received a reward: {name} — {desc}
+broadcast_scandal,[EVENT] Scandal: {player} reputation -10 and was "persuaded to donate" 300 yuan
+broadcast_scandal_extra,{player} was also implicated — reputation -5
+broadcast_traffic,[EVENT] {player} will skip next turn due to a traffic accident
+broadcast_charity_donate,{player} donated 400 yuan to the charity center — +12 reputation
+ui_cash_short_donate,Not enough cash to donate
+ui_cash_short_train,Not enough cash to ride the train
+broadcast_alliance_rep,{player} also gained +5 reputation
+event_typhoon,[EVENT] Typhoon: all players teleported to random positions
+event_border_closed,[EVENT] Border lockdown: everyone rolls a single die for 4 rounds
+event_teleport_train,{player} was teleported to the train station
+event_reroll,{player} may roll the dice again
+event_richest_minus200,{player} is the richest — -200 yuan
+event_poorest_plus200,{player} is the poorest — +200 yuan
+event_sell_none,{player} has no property to sell
+event_sell_done,{player} sold a property for {refund} yuan
+event_downgrade_none,{player} has no property to downgrade
+event_downgrade_done,One of {player}'s properties was downgraded
+event_grab_none,[REWARD] No government plots left on the market — the grab fell through
+event_grab_win,[REWARD] {player} won a government plot!
+event_network_none,[REWARD] Nobody else owns property — the connection fell through
+event_network_poor,[REWARD] Not enough cash — the opportunity slipped away
+event_network_deal,[DEAL] {buyer} used connections to buy plot {tile} from {seller} for {price} yuan (15% off market)
+event_freeupgrade_none,{player} has no property to upgrade
+event_freeupgrade_done,[REWARD] {player}'s property was upgraded to level {level} for free
+event_train_ride,{player} spent 50 yuan riding the train
+ui_your_turn_dice,YOUR TURN — Roll the dice!
+broadcast_trend_up,all city assets appreciating!
+broadcast_trend_down,land values dropping…
+broadcast_bargain_win,[DEAL] Success! {buyer} bought the property for {price} yuan
+broadcast_bargain_lose,[DEAL] Failed — {buyer} paid {rent} yuan rent
+ui_enter_bargain,Entering negotiation…
+ui_player_fallback,Player {n}
+ui_seller,the seller
+bargain_note_saved,market {market} yuan — saved {pct}%
+bargain_note_overpaid,above market ({market} yuan) — overpaid…
+broadcast_deal_done,[DEAL] {buyer} purchased plot {tile} for {price} yuan ({note})
+ui_prosperity,Prosperity {value}{arrow} | {phase}{rule}
+result_success_line,{quote}Deal closed!\n{buyer} purchased {tile} (from {seller}) for {price} yuan{role}
+result_fail_line,{quote}Negotiation failed\n{buyer} must pay {seller} rent for {tile}{role}
+card_adv,First-round advantage: {adv}
+card_rate,Concession rate: {rate}
+card_rep,Reputation: {rep}
+tile_building_info,Building (Lv.{level}) — Owner: {owner} — Market: {market} yuan
+
+# ===== v4.2 合并新增（团队功能接线的词条）=====
+broadcast_load_save,Save loaded — resuming from round {round}
+broadcast_bargain_lose2,[DEAL] Failed — {buyer} paid {rent} yuan rent to {seller} for {tile}
+ui_gov,the government
+ui_test_bargain_1,[TEST] Straight to bargain: AI buys player property
+ui_test_bargain_2,[TEST] Second bargain: player buys AI property
+ui_test_bargain_done,Test mode: two bargain flows completed — game over
+bargain_title_aivai,AI negotiating with AI
+bargain_title_seller,You are the SELLER — pick your strategy
+bargain_title_buyer,You are the BUYER — pick your strategy
+ui_role_buyer, (you are the buyer)
+ui_role_seller, (you are the seller)
+ui_property,the property
+panel_charity_info,Charity Center\nDonate {cost} yuan\nfor {rep} reputation
+panel_l3_note,(Level 3 Double!)
+broadcast_bankrupt_infamous,[WARNING] {player} went bankrupt — despised and abandoned the city collapses…

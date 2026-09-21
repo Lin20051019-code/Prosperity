@@ -52,6 +52,10 @@ namespace SheNicest.UI
             return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
 
+        // ===== i18n（v4.2）=====
+        /// <summary>当前语言（"zh"中文 / "en"英文，默认中文）。主菜单语言按钮切换。</summary>
+        public static string language = "zh";
+
         // ===== 对话系统（台词池 + 情绪标签 + 动态变量，v3移植） =====
         /// <summary>台词：text为文案（支持{opponent}{price}{diff}{offer}{final}占位符），emotion为表情索引 0平1怒2惊3得意</summary>
         public struct DialogLine
@@ -121,7 +125,7 @@ namespace SheNicest.UI
             if (dialogsLoaded) return;
             dialogsLoaded = true;
 
-            var asset = Resources.Load<TextAsset>("BargainDialogs");
+            var asset = Resources.Load<TextAsset>(language == "en" ? "BargainDialogs_en" : "BargainDialogs");
             if (asset == null) { Debug.LogError("[Bargain] Resources/BargainDialogs.csv not found"); return; }
 
             dialogPools.Clear();

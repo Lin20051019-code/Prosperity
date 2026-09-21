@@ -1,0 +1,7 @@
+﻿eventName,description,effectType,cashChange,reputationChange,skipNextTurn,effectDescription,flavorText,eventKey
+Impulse Spending,"Gifts to streamers, top-ups in games",CashLoss,-300,0,false,Lose 300 cash,"Gifts to streamers, microtransactions in games. Your wallet never stood a chance.",冲动消费
+Red Light Violation,Caught running a red light,ReputationLoss,0,-10,false,Reputation -10,"You thought those extra seconds were worth it. The surveillance camera disagreed.",闯红灯被抓
+Cash Flow Crisis,Need to liquidate assets to cover debts,SellProperty,0,0,false,Sell one property at 60% market value,"The pressure is mounting. You have no choice but to sell — the government buys at 60% of market value.",资金紧缺
+Cutthroat Rivalry,You and another player expose each other,CashAndRepLoss,0,-5,false,Reputation -5 for both,"You tried to steal a slice of someone else's pie. Turns out they had the same idea. Nobody wins.",恶性竞争
+Neglected Property,Your property falls into disrepair,DowngradeProperty,0,0,false,One of your properties downgrades,"Nobody's maintained this place in years. Paint peeling, fixtures failing. The glory days are long gone.",年久失修
+Fell Ill,You need to rest,SkipTurn,0,0,true,Skip next turn,"All that running around finally caught up with you. This time, you have to stop.",生病休息

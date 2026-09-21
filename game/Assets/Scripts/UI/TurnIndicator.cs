@@ -163,6 +163,12 @@ namespace SheNicest.UI
 
         private IEnumerator BannerRoutine(string text, Color color, float duration)
         {
+            // 自愈：Initialize未被调用（如从砍价场景返回的恢复路径）时兜底找Canvas，避免空引用
+            if (parentCanvas == null)
+            {
+                parentCanvas = FindObjectOfType<Canvas>();
+                if (parentCanvas == null) yield break;
+            }
             // 创建横幅
             bannerObj = new GameObject("TurnBanner");
             bannerObj.transform.SetParent(parentCanvas.transform, false);
@@ -276,7 +282,7 @@ namespace SheNicest.UI
         {
             if (roundHudText == null) return;
 
-            roundHudText.text = $"回合 {currentRound}/{maxRounds}  |  繁荣 {prosperity}";
+            roundHudText.text = I18n.T("ui_round_hud", $"回合 {currentRound}/{maxRounds}  |  繁荣 {prosperity}", ("round", currentRound), ("max", maxRounds), ("prosperity", prosperity));
 
             // 进度条按回合填充
             float pct = (float)(currentRound - 1) / maxRounds;
@@ -310,13 +316,13 @@ namespace SheNicest.UI
         /// <summary>AI 回合高亮提示</summary>
         public void HighlightAITurn(string aiName)
         {
-            ShowBanner($"{aiName} 正在行动…", AIWarningColor, 0.8f);
+            ShowBanner(I18n.T("ui_ai_turn", $"{aiName} 正在行动…", ("name", aiName)), AIWarningColor, 0.8f);
         }
 
         /// <summary>危机区闪烁警告（一次性）</summary>
         public void FlashDanger()
         {
-            ShowBanner("【警告】城市进入衰退期！", DangerColor, 2f);
+            ShowBanner(I18n.T("broadcast_phase_crisis", "【警告】城市进入衰退期！"), DangerColor, 2f);
         }
     }
 }

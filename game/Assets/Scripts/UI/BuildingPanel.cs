@@ -44,7 +44,7 @@ namespace SheNicest.UI
                 infoText.text = $"空地（0级）\n市场价格: {marketPrice}元\n购买费用: {BuildingData.BuyCost}元（政府补贴价）";
 
             if (actionButtonText != null)
-                actionButtonText.text = $"购买 ({BuildingData.BuyCost}元)";
+                actionButtonText.text = I18n.T("panel_buy_btn", $"购买 ({BuildingData.BuyCost}元)", ("price", BuildingData.BuyCost));
             if (actionButton != null) actionButton.gameObject.SetActive(true);
             if (bargainButton != null) bargainButton.gameObject.SetActive(false);
             if (skipButton != null) skipButton.gameObject.SetActive(true);
@@ -60,7 +60,7 @@ namespace SheNicest.UI
             if (panel != null) panel.SetActive(true);
 
             if (infoText != null)
-                infoText.text = $"公益中心\n捐款 {cost} 元\n可获得 {repGain} 点声望";
+                infoText.text = I18n.T("panel_charity_info", $"公益中心\n捐款 {cost} 元\n可获得 {repGain} 点声望", ("cost", cost), ("rep", repGain));
 
             if (actionButtonText != null)
                 actionButtonText.text = $"捐款 ({cost}元)";
@@ -82,7 +82,7 @@ namespace SheNicest.UI
                 infoText.text = $"🚂 火车站\n乘坐火车前往另一个火车站\n费用: {cost}元";
 
             if (actionButtonText != null)
-                actionButtonText.text = $"乘坐 ({cost}元)";
+                actionButtonText.text = I18n.T("panel_train_btn", $"乘坐 ({cost}元)", ("price", cost));
             if (actionButton != null) actionButton.gameObject.SetActive(true);
             if (bargainButton != null) bargainButton.gameObject.SetActive(false);
             if (skipButton != null) skipButton.gameObject.SetActive(true);
@@ -105,7 +105,7 @@ namespace SheNicest.UI
                 infoText.text = $"{data.level}级建筑（{ownerName}）\n市场价格: {marketPrice}元{nextInfo}";
 
             if (actionButtonText != null)
-                actionButtonText.text = data.CanUpgrade ? $"升级 ({BuildingData.UpgradeCost}元)" : "已满级";
+                actionButtonText.text = data.CanUpgrade ? I18n.T("panel_upgrade_btn", $"升级 ({BuildingData.UpgradeCost}元)", ("price", BuildingData.UpgradeCost)) : I18n.T("panel_maxed", "已满级");
             if (actionButton != null) actionButton.gameObject.SetActive(data.CanUpgrade);
             if (bargainButton != null) bargainButton.gameObject.SetActive(false);
             if (skipButton != null) skipButton.gameObject.SetActive(true);
@@ -123,11 +123,11 @@ namespace SheNicest.UI
             if (infoText != null)
             {
                 int rent = data.GetRent();
-                infoText.text = $"{data.level}级建筑（{ownerName}）\n市场价格: {marketPrice}元\n租金: {rent}元{(data.level >= 3 ? "（3级翻倍）" : "")}";
+                infoText.text = I18n.T("panel_owned_building", $"{data.level}级建筑（{ownerName}）\n市场价格: {marketPrice}元\n租金: {rent}元{(data.level >= 3 ? "（3级翻倍）" : "")}", ("level", data.level), ("owner", ownerName), ("market", marketPrice), ("rent", rent), ("l3note", data.level >= 3 ? I18n.T("panel_l3_note", "（3级翻倍）") : ""));
             }
 
             if (actionButtonText != null)
-                actionButtonText.text = $"支付租金 ({data.GetRent()}元)";
+                actionButtonText.text = I18n.T("panel_rent_btn", $"支付租金 ({data.GetRent()}元)", ("price", data.GetRent()));
             if (actionButton != null) actionButton.gameObject.SetActive(true);
             if (bargainButtonText != null)
                 bargainButtonText.text = "Bargain";

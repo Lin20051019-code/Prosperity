@@ -28,6 +28,14 @@ namespace SheNicest.UI
         private bool showing;
         private int lastShownPriority = P2;
 
+        // v2.0 5.3：卷轴播报条样式
+        private Image priorityStrip;                        // 左侧优先级竖条（8px）
+        private static readonly Color TextInk = new Color(0.165f, 0.122f, 0.078f);   // #2A1F14 深墨
+        private static readonly Color TextAlert = new Color(0.549f, 0.118f, 0.071f); // #8C1E12 P0深红
+        private static readonly Color StripP0 = new Color(0.651f, 0.118f, 0.098f);   // #A61E19
+        private static readonly Color StripP1 = new Color(0.612f, 0.478f, 0.180f);   // #9C7A2E
+        private static readonly Color StripP2 = new Color(0.290f, 0.365f, 0.227f);   // #4A5D3A
+
         private void Start()
         {
             if (panel != null)
@@ -36,7 +44,39 @@ namespace SheNicest.UI
                 if (canvasGroup == null)
                     canvasGroup = panel.AddComponent<CanvasGroup>();
                 panel.SetActive(false);
+                EnsurePriorityStrip();
             }
+            // 字体走项目安全字体（团结引擎内置字体坑）
+            if (messageText != null && messageText.font == null)
+                messageText.font = BargainState.GetSafeFont();
+        }
+
+        /// <summary>创建左侧优先级竖条（叠在卷轴左端轴杆内侧，8px宽）</summary>
+        private void EnsurePriorityStrip()
+        {
+            if (panel == null) return;
+            var existing = panel.transform.Find("PriorityStrip");
+            if (existing != null) { priorityStrip = existing.GetComponent<Image>(); return; }
+            var go = new GameObject("PriorityStrip", typeof(Image));
+            go.transform.SetParent(panel.transform, false);
+            priorityStrip = go.GetComponent<Image>();
+            priorityStrip.raycastTarget = false;
+            priorityStrip.color = StripP2;
+            var rt = priorityStrip.rectTransform;
+            rt.anchorMin = new Vector2(0f, 0.5f);
+            rt.anchorMax = new Vector2(0f, 0.5f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(68f, 0f); // 纸面左缘内侧（纸面约从65px起）
+            rt.sizeDelta = new Vector2(8f, 90f);        // 竖条高度覆盖纸面文字带
+        }
+
+        /// <summary>按优先级设置竖条与文字颜色（v2.0 5.3）</summary>
+        private void ApplyPriorityStyle(int priority)
+        {
+            if (priorityStrip != null)
+                priorityStrip.color = priority == P0 ? StripP0 : priority == P1 ? StripP1 : StripP2;
+            if (messageText != null)
+                messageText.color = priority == P0 ? TextAlert : TextInk;
         }
 
         /// <summary>播报一条消息（默认P2常规优先级）</summary>
@@ -101,6 +141,7 @@ namespace SheNicest.UI
         {
             messageText.text = message;
             lastShownPriority = priority;
+            ApplyPriorityStyle(priority); // v2.0 5.3：竖条+文字颜色随优先级
             panel.SetActive(true);
             showing = true;
             currentCoroutine = StartCoroutine(ShowAndFade(priority == P0 ? Mathf.Max(duration, 4f) : duration));

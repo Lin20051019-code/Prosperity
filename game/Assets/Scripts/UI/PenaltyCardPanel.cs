@@ -58,10 +58,11 @@ namespace SheNicest.UI
             if (confirmButton != null)
                 confirmButton.onClick.AddListener(OnConfirm);
 
-            // 加载所有CSV
-            penaltyPool = LoadCSV(penaltyCsvPath);
-            eventPool = LoadCSV(eventCsvPath);
-            rewardPool = LoadCSV(rewardCsvPath);
+            // v4.2 i18n：按语言加载（英文版CSV带第9列eventKey中文逻辑键）
+            bool isEn = BargainState.language == "en";
+            penaltyPool = LoadCSV(isEn ? penaltyCsvPath + "_en" : penaltyCsvPath);
+            eventPool = LoadCSV(isEn ? eventCsvPath + "_en" : eventCsvPath);
+            rewardPool = LoadCSV(isEn ? rewardCsvPath + "_en" : rewardCsvPath);
 
             // 设置像素字体
             SetPixelFont();

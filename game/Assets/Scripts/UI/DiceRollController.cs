@@ -130,6 +130,13 @@ namespace SheNicest.UI
                 }
             }
 
+            // v4.2 i18n：玩家显示名按语言切换（char_0..3，中文场景序列化名为默认）
+            for (int i = 0; i < playerInfoPanels.Count && i < 4; i++)
+            {
+                if (playerInfoPanels[i] == null) continue;
+                playerInfoPanels[i].Data.playerName = I18n.T($"char_{i}", playerInfoPanels[i].Data.playerName);
+            }
+
             // 设置初始缩放
             if (board != null)
             {
@@ -142,6 +149,17 @@ namespace SheNicest.UI
 
             // 播放游戏场景BGM
             AudioManager.Instance?.PlayGameSceneBGM();
+
+            // 初始化回合提示系统 + 3D骰子视口（必须在提前return之前：存档读取/Bargain返回路径同样需要，
+            // 否则从砍价场景回棋盘后 parentCanvas 为null → AI回合横幅空引用）
+            if (turnIndicator != null)
+            {
+                var canvas = GetComponentInParent<Canvas>();
+                if (canvas == null) canvas = FindObjectOfType<Canvas>();
+                turnIndicator.Initialize(canvas);
+                turnIndicator.CreateRoundHud(canvas, MaxRounds);
+                Dice3D.EnsureView(dicePanel, canvas); // 视效v2：3D像素骰子（场景里可调 Dice3DViewport）
+            }
 
             // 存档读取（主菜单「继续游戏」进入），优先于Bargain临时态恢复
             if (SaveLoadManager.pendingLoadSlot != SaveLoadManager.NoSlot)
@@ -192,15 +210,6 @@ namespace SheNicest.UI
             // 初始化繁荣值UI
             UpdateProsperity();
 
-            // 初始化回合提示系统（v4移植）
-            if (turnIndicator != null)
-            {
-                var canvas = GetComponentInParent<Canvas>();
-                if (canvas == null) canvas = FindObjectOfType<Canvas>();
-                turnIndicator.Initialize(canvas);
-                turnIndicator.CreateRoundHud(canvas, MaxRounds);
-            }
-
             // ===== 测试模式：开局直接进入Bargain流程 =====
             if (testBargainMode)
             {
@@ -212,7 +221,7 @@ namespace SheNicest.UI
                         rollDiceButton.interactable = false; // 测试期间禁用掷骰，防止回合切换窗口误触
                     if (hintText != null)
                         hintText.text = "[测试] 直接进入Bargain：AI购买玩家房产";
-                    BroadcastMsg("[测试] 直接进入Bargain：AI购买玩家房产");
+                    BroadcastMsg(I18n.T("ui_test_bargain_1", "[测试] 直接进入Bargain：AI购买玩家房产"));
                     var data = buildingData[TestBargainState.playerTileIndex];
                     StartBargain(TestBargainState.playerTileIndex, 1, data); // AI1(罗斯韦尔)作为买方
                     return;
@@ -228,7 +237,7 @@ namespace SheNicest.UI
             // ===== 测试模式结束 =====
 
             // 第1回合开始播报
-            BroadcastMsg("第1回合开始");
+            BroadcastMsg(I18n.T("broadcast_round", "第1回合开始", ("round", 1)));
 
             // 开局性格暗示播报（Bot v2：不点名，让玩家局内猜谜）
             {
@@ -246,7 +255,7 @@ namespace SheNicest.UI
                 if (hasVampire) hints.Add("有人嗜财如命，谈判桌上寸步不让");
                 if (hasHoarder) hints.Add("有人囤地成瘾，见到空地就挪不动脚");
                 if (hints.Count > 0)
-                    BroadcastMsg($"【传闻】本局暗流涌动——{string.Join("；", hints)}……是谁呢？", BroadcastBar.P1, 4f);
+                    BroadcastMsg(I18n.T("broadcast_rumor_combined", $"【传闻】本局暗流涌动——{string.Join("；", hints)}……是谁呢？", ("hints", string.Join(I18n.T("ui_semicolon", "；"), hints))), BroadcastBar.P1, 4f);
             }
 
             // 玩家回合开始
@@ -279,7 +288,7 @@ namespace SheNicest.UI
             {
                 skipNextTurn[0] = false;
                 Debug.Log("[Turn] Player turn skipped (penalty)");
-                BroadcastMsg($"{playerInfoPanels[0].Data.playerName} 的回合被跳过（交通事故）");
+                BroadcastMsg(I18n.T("broadcast_traffic_skip", $"{playerInfoPanels[0].Data.playerName} 的回合被跳过（交通事故）", ("player", playerInfoPanels[0].Data.playerName)));
                 if (hintText != null)
                     hintText.text = "你的回合被跳过（堵车）";
                 StartCoroutine(SkipAndNextTurn());
@@ -289,7 +298,7 @@ namespace SheNicest.UI
             // 回合横幅 + 骰子脉动（v4移植）
             if (turnIndicator != null)
             {
-                turnIndicator.ShowBanner("你的回合 — 掷骰子！", TurnIndicator.PlayerColor, 1f);
+                turnIndicator.ShowBanner(I18n.T("ui_your_turn_dice", "你的回合 — 掷骰子！"), TurnIndicator.PlayerColor, 1f);
                 turnIndicator.StartPulse(rollDiceButton);
             }
 
@@ -323,7 +332,7 @@ namespace SheNicest.UI
             {
                 skipNextTurn[aiIndex] = false;
                 Debug.Log($"[Turn] AI{aiIndex} turn skipped (penalty)");
-                BroadcastMsg($"{playerInfoPanels[aiIndex].Data.playerName} 的回合被跳过（交通事故）");
+                BroadcastMsg(I18n.T("broadcast_traffic_skip", $"{playerInfoPanels[aiIndex].Data.playerName} 的回合被跳过（交通事故）", ("player", playerInfoPanels[aiIndex].Data.playerName)));
                 yield return new WaitForSeconds(turnDelay);
                 yield return NextTurn();
                 yield break;
@@ -360,16 +369,23 @@ namespace SheNicest.UI
                 if (hintText != null)
                     hintText.text = $"{playerInfoPanels[aiIndex].Data.playerName} 掷骰子中...";
 
-                // 数字快速变化模拟旋转
-                float diceElapsed = 0f;
-                while (diceElapsed < rollDuration)
+                // 视效v2：优先3D像素骰子（回落2D洗面）
+                if (Dice3D.Play(dice1Result, dice2Result, Mathf.Max(rollDuration, 1.2f)))
                 {
-                    diceElapsed += rollInterval;
-                    if (dice1FaceImage != null && diceSprites.Count > 0)
-                        dice1FaceImage.sprite = diceSprites[Random.Range(0, 6)];
-                    if (dice2FaceImage != null && diceSprites.Count > 0)
-                        dice2FaceImage.sprite = diceSprites[Random.Range(0, 6)];
-                    yield return new WaitForSeconds(rollInterval);
+                    yield return new WaitUntil(() => !Dice3D.IsRolling);
+                }
+                else
+                {
+                    float diceElapsed = 0f;
+                    while (diceElapsed < rollDuration)
+                    {
+                        diceElapsed += rollInterval;
+                        if (dice1FaceImage != null && diceSprites.Count > 0)
+                            dice1FaceImage.sprite = diceSprites[Random.Range(0, 6)];
+                        if (dice2FaceImage != null && diceSprites.Count > 0)
+                            dice2FaceImage.sprite = diceSprites[Random.Range(0, 6)];
+                        yield return new WaitForSeconds(rollInterval);
+                    }
                 }
 
                 // 播放骰子落下音效
@@ -384,7 +400,7 @@ namespace SheNicest.UI
                 int chosenSteps = GetDiceSteps();
 
                 Debug.Log($"[AI{aiIndex}] Moving {chosenSteps} steps (dice1={dice1Result} + dice2={dice2Result})");
-                BroadcastMsg($"{playerInfoPanels[aiIndex].Data.playerName} 掷出 {dice1Result} + {dice2Result} = {chosenSteps} 步");
+                BroadcastMsg(I18n.T("ui_dice_result", $"{playerInfoPanels[aiIndex].Data.playerName} 掷出 {dice1Result} + {dice2Result} = {chosenSteps} 步", ("player", playerInfoPanels[aiIndex].Data.playerName), ("d1", dice1Result), ("d2", dice2Result), ("steps", chosenSteps)));
 
                 // 等待让玩家看清结果
                 yield return new WaitForSeconds(1.5f);
@@ -405,7 +421,7 @@ namespace SheNicest.UI
                 {
                     rerollNextTurn[aiIndex] = false;
                     needsReroll = true;
-                    BroadcastMsg($"{playerInfoPanels[aiIndex].Data.playerName} 道路修缮，再投一次骰子");
+                    BroadcastMsg(I18n.T("ui_road_repair_ai", $"{playerInfoPanels[aiIndex].Data.playerName} 道路修缮，再投一次骰子", ("player", playerInfoPanels[aiIndex].Data.playerName)));
                 }
             } while (needsReroll);
 
@@ -441,7 +457,7 @@ namespace SheNicest.UI
                 {
                     borderClosedRounds--;
                     if (borderClosedRounds == 0)
-                        BroadcastMsg("【事件】边境重新开放，双骰恢复！", BroadcastBar.P1);
+                        BroadcastMsg(I18n.T("broadcast_border_open", "【事件】边境重新开放，双骰恢复！"), BroadcastBar.P1);
                 }
 
                 // v2.2 M套件：回合末经济收发（危机维持费/通胀吞噬/冲刺红利）
@@ -466,7 +482,7 @@ namespace SheNicest.UI
                 }
 
                 // 新回合播报 + HUD更新（v4移植）
-                BroadcastMsg($"第{currentRound}回合开始");
+                BroadcastMsg(I18n.T("broadcast_round", $"第{currentRound}回合开始", ("round", currentRound)));
                 turnIndicator?.UpdateRoundHud(currentRound, MaxRounds, currentProsperity, (int)currentPhase);
             }
 
@@ -532,15 +548,23 @@ namespace SheNicest.UI
             if (hintText != null)
                 hintText.text = $"{playerInfoPanels[0].Data.playerName} 掷骰子中...";
 
-            float elapsed = 0f;
-            while (elapsed < rollDuration)
+            // 视效v2：优先3D像素骰子翻滚（贴图缺失时回落2D洗面）
+            if (Dice3D.Play(dice1Result, dice2Result, Mathf.Max(rollDuration, 1.2f)))
             {
-                elapsed += rollInterval;
-                if (dice1FaceImage != null && diceSprites.Count > 0)
-                    dice1FaceImage.sprite = diceSprites[Random.Range(0, 6)];
-                if (dice2FaceImage != null && diceSprites.Count > 0)
-                    dice2FaceImage.sprite = diceSprites[Random.Range(0, 6)];
-                yield return new WaitForSeconds(rollInterval);
+                yield return new WaitUntil(() => !Dice3D.IsRolling);
+            }
+            else
+            {
+                float elapsed = 0f;
+                while (elapsed < rollDuration)
+                {
+                    elapsed += rollInterval;
+                    if (dice1FaceImage != null && diceSprites.Count > 0)
+                        dice1FaceImage.sprite = diceSprites[Random.Range(0, 6)];
+                    if (dice2FaceImage != null && diceSprites.Count > 0)
+                        dice2FaceImage.sprite = diceSprites[Random.Range(0, 6)];
+                    yield return new WaitForSeconds(rollInterval);
+                }
             }
 
             // 播放骰子落下音效
@@ -558,7 +582,7 @@ namespace SheNicest.UI
                 hintText.text = $"掷出 {dice1Result} + {dice2Result} = {steps}";
 
             Debug.Log($"[Player] Dice sum={steps}");
-            BroadcastMsg($"掷出 {dice1Result} + {dice2Result} = {steps} 步");
+            BroadcastMsg(I18n.T("ui_dice_result", $"掷出 {dice1Result} + {dice2Result} = {steps} 步", ("player", playerInfoPanels[0].Data.playerName), ("d1", dice1Result), ("d2", dice2Result), ("steps", steps)));
 
             isBusy = false;
             waitingForChoice = false;
@@ -619,7 +643,7 @@ namespace SheNicest.UI
             }
 
             Debug.Log($"[Dice] Dice1={dice1Result}, Dice2={dice2Result}, Sum={dice1Result + dice2Result}");
-            BroadcastMsg($"掷出 {dice1Result} 和 {dice2Result}，合计 {dice1Result + dice2Result} 步");
+            BroadcastMsg(I18n.T("ui_dice_double", $"掷出 {dice1Result} 和 {dice2Result}，合计 {dice1Result + dice2Result} 步", ("d1", dice1Result), ("d2", dice2Result), ("steps", dice1Result + dice2Result)));
         }
 
         // ==================== 玩家选择 ====================
@@ -669,7 +693,7 @@ namespace SheNicest.UI
             if (rerollNextTurn[0])
             {
                 rerollNextTurn[0] = false;
-                BroadcastMsg("道路修缮：可以再投一次骰子");
+                BroadcastMsg(I18n.T("ui_road_repair", "道路修缮：可以再投一次骰子"));
                 if (rollDiceButton != null)
                     rollDiceButton.interactable = true;
                 yield break;
@@ -716,8 +740,9 @@ namespace SheNicest.UI
                         pd.cash += salary;
                         playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
                         AudioManager.Instance?.PlayCoin();
+                        FlyMoney(tilePath[0] as RectTransform, playerInfoPanels[tokenIndex].transform as RectTransform, salary, playerInfoPanels[tokenIndex]);
                         Debug.Log($"[Salary] Token{tokenIndex} passed start, +{salary} cash → {pd.cash}");
-                        BroadcastMsg($"{pd.playerName} 经过起点，获得工资{salary}元");
+                        BroadcastMsg(I18n.T("broadcast_salary", $"{pd.playerName} 经过起点，获得工资{salary}元", ("player", pd.playerName), ("salary", salary)));
                     }
                 }
 
@@ -906,7 +931,7 @@ namespace SheNicest.UI
                 if (selectedEvent != null)
                 {
                     ApplyPenaltyEffect(tokenIndex, selectedEvent);
-                    BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 触发惩罚: {selectedEvent.eventName} — {selectedEvent.effectDescription}");
+                    BroadcastMsg(I18n.T("ui_event_penalty", $"{playerInfoPanels[tokenIndex].Data.playerName} 触发惩罚: {selectedEvent.eventName} — {selectedEvent.effectDescription}", ("player", playerInfoPanels[tokenIndex].Data.playerName), ("name", selectedEvent.eventName), ("desc", selectedEvent.effectDescription)));
                 }
             }
 
@@ -966,7 +991,7 @@ namespace SheNicest.UI
                         if (randomOther >= 0)
                         {
                             ApplyEffectToPlayer(randomOther, eventData);
-                            BroadcastMsg($"{playerInfoPanels[randomOther].Data.playerName} 也被牵连，声望-5");
+                            BroadcastMsg(I18n.T("broadcast_scandal_extra", $"{playerInfoPanels[randomOther].Data.playerName} 也被牵连，声望-5", ("player", playerInfoPanels[randomOther].Data.playerName)));
                         }
                     }
                     else
@@ -1028,7 +1053,7 @@ namespace SheNicest.UI
                     pd.cash -= 400;
                     pd.reputation = Mathf.Clamp(pd.reputation + 12, 0, 100);
                     playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-                    BroadcastMsg($"{pd.playerName} 向公益中心捐款400元，获得12声誉");
+                    BroadcastMsg(I18n.T("broadcast_charity_donate", $"{pd.playerName} 向公益中心捐款400元，获得12声誉", ("player", pd.playerName)));
                 }
                 else
                 {
@@ -1063,11 +1088,11 @@ namespace SheNicest.UI
                     pd.cash -= 400;
                     pd.reputation = Mathf.Clamp(pd.reputation + 12, 0, 100);
                     playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-                    BroadcastMsg($"{pd.playerName} 向公益中心捐款400元，获得12声誉");
+                    BroadcastMsg(I18n.T("broadcast_charity_donate", $"{pd.playerName} 向公益中心捐款400元，获得12声誉", ("player", pd.playerName)));
                 }
                 else
                 {
-                    BroadcastMsg("现金不足，无法捐款");
+                    BroadcastMsg(I18n.T("ui_cash_short_donate", "现金不足，无法捐款"));
                 }
             }
         }
@@ -1085,7 +1110,7 @@ namespace SheNicest.UI
             float triggerRate = currentPhase == GamePhase.Sprint ? 0.55f : 0.40f;
             if (Random.value > triggerRate)
             {
-                BroadcastMsg("风平浪静，无事发生");
+                BroadcastMsg(I18n.T("broadcast_quiet", "风平浪静，无事发生"));
                 yield break;
             }
 
@@ -1106,7 +1131,7 @@ namespace SheNicest.UI
             if (selectedEvent != null)
             {
                 ApplyEventEffect(selectedEvent, tokenIndex);
-                BroadcastMsg($"全局事件: {selectedEvent.eventName} — {selectedEvent.effectDescription}");
+                BroadcastMsg(I18n.T("ui_event_global", $"全局事件: {selectedEvent.eventName} — {selectedEvent.effectDescription}", ("name", selectedEvent.eventName), ("desc", selectedEvent.effectDescription)));
             }
         }
 
@@ -1127,7 +1152,7 @@ namespace SheNicest.UI
                 {
                     var evt = penaltyCardPanel.rewardPool[Random.Range(0, penaltyCardPanel.rewardPool.Count)];
                     ApplyRewardEffect(evt, tokenIndex);
-                    BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 获得奖励: {evt.eventName} — {evt.effectDescription}");
+                    BroadcastMsg(I18n.T("ui_event_reward", $"{playerInfoPanels[tokenIndex].Data.playerName} 获得奖励: {evt.eventName} — {evt.effectDescription}", ("player", playerInfoPanels[tokenIndex].Data.playerName), ("name", evt.eventName), ("desc", evt.effectDescription)));
                 }
                 yield break;
             }
@@ -1149,7 +1174,7 @@ namespace SheNicest.UI
             if (selectedEvent != null)
             {
                 ApplyRewardEffect(selectedEvent, tokenIndex);
-                BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 获得奖励: {selectedEvent.eventName} — {selectedEvent.effectDescription}");
+                BroadcastMsg(I18n.T("ui_event_reward", $"{playerInfoPanels[tokenIndex].Data.playerName} 获得奖励: {selectedEvent.eventName} — {selectedEvent.effectDescription}", ("player", playerInfoPanels[tokenIndex].Data.playerName), ("name", selectedEvent.eventName), ("desc", selectedEvent.effectDescription)));
             }
         }
 
@@ -1196,7 +1221,7 @@ namespace SheNicest.UI
                         }
                         if (shakeTiles.Count > 0)
                             StartCoroutine(EarthquakeShakeAnim(shakeTiles));
-                        BroadcastMsg($"【事件】地震：{downgraded}处房产降级", BroadcastBar.P1);
+                        BroadcastMsg(I18n.T("broadcast_earthquake", $"【事件】地震：{downgraded}处房产降级", ("count", downgraded)), BroadcastBar.P1);
                     }
                     break;
 
@@ -1218,7 +1243,7 @@ namespace SheNicest.UI
                                 playerInfoPanels[i].Data.reputation = Mathf.Clamp(playerInfoPanels[i].Data.reputation - 10, 0, 100);
                                 playerInfoPanels[i].Data.cash -= 300;
                                 playerInfoPanels[i].UpdateDisplay(); UpdateProsperity();
-                                BroadcastMsg($"【事件】丑闻：{playerInfoPanels[i].Data.playerName} 声誉-10，被\"劝捐\"300元", BroadcastBar.P1);
+                                BroadcastMsg(I18n.T("broadcast_scandal", $"【事件】丑闻：{playerInfoPanels[i].Data.playerName} 声誉-10，被\"劝捐\"300元", ("player", playerInfoPanels[i].Data.playerName)), BroadcastBar.P1);
                             }
                         }
                     }
@@ -1235,7 +1260,7 @@ namespace SheNicest.UI
                     {
                         int randomPlayer = Random.Range(0, 4);
                         skipNextTurn[randomPlayer] = true;
-                        BroadcastMsg($"【事件】{playerInfoPanels[randomPlayer].Data.playerName} 因交通事故下回合被跳过", BroadcastBar.P2);
+                        BroadcastMsg(I18n.T("broadcast_traffic", $"【事件】{playerInfoPanels[randomPlayer].Data.playerName} 因交通事故下回合被跳过", ("player", playerInfoPanels[randomPlayer].Data.playerName)), BroadcastBar.P2);
                     }
                     break;
 
@@ -1265,13 +1290,13 @@ namespace SheNicest.UI
                             Vector2 pos = GetTileAnchorPos(randTile);
                             if (tokens[i] != null) tokens[i].anchoredPosition = pos;
                         }
-                        BroadcastMsg("【事件】台风：所有玩家被传送到随机位置", BroadcastBar.P1);
+                        BroadcastMsg(I18n.T("event_typhoon", "【事件】台风：所有玩家被传送到随机位置"), BroadcastBar.P1);
                     }
                     else if (name == "边境封锁")
                     {
                         // 边境封锁：全员单骰4回合（v3移植）
                         borderClosedRounds = 4;
-                        BroadcastMsg("【事件】边境封锁：全员只能掷一个骰子，持续4回合", BroadcastBar.P1);
+                        BroadcastMsg(I18n.T("event_border_closed", "【事件】边境封锁：全员只能掷一个骰子，持续4回合"), BroadcastBar.P1);
                     }
                     else if (name == "罗宾汉出没")
                     {
@@ -1286,7 +1311,7 @@ namespace SheNicest.UI
                         {
                             playerInfoPanels[richest].Data.cash -= 500;
                             playerInfoPanels[richest].UpdateDisplay(); UpdateProsperity();
-                            BroadcastMsg($"【事件】罗宾汉出没：{playerInfoPanels[richest].Data.playerName} 被劫500元", BroadcastBar.P1);
+                            BroadcastMsg(I18n.T("broadcast_robin_event", $"【事件】罗宾汉出没：{playerInfoPanels[richest].Data.playerName} 被劫500元", ("rich", playerInfoPanels[richest].Data.playerName)), BroadcastBar.P1);
                         }
                     }
                     else if (name == "伸出援手")
@@ -1304,7 +1329,7 @@ namespace SheNicest.UI
                         // v2.2 P1修复：唯一索引匹配（原"值相等"匹配在并列时放大效果、全员相等时全员白拿）
                         if (maxW2 == minW2)
                         {
-                            BroadcastMsg("【事件】市政库充盈，本轮无需救济");
+                            BroadcastMsg(I18n.T("event_aid_skipped", "【事件】市政库充盈，本轮无需救济"));
                             UpdateProsperity();
                         }
                         else
@@ -1321,13 +1346,13 @@ namespace SheNicest.UI
                             {
                                 playerInfoPanels[richIdx].Data.cash -= 500;
                                 playerInfoPanels[richIdx].UpdateDisplay();
-                                BroadcastMsg($"【事件】伸出援手：{playerInfoPanels[richIdx].Data.playerName} 是最富的，-500");
+                                BroadcastMsg(I18n.T("broadcast_charity_rich", $"【事件】伸出援手：{playerInfoPanels[richIdx].Data.playerName} 是最富的，-500", ("rich", playerInfoPanels[richIdx].Data.playerName)));
                             }
                             if (poorIdx >= 0)
                             {
                                 playerInfoPanels[poorIdx].Data.cash += aid;
                                 playerInfoPanels[poorIdx].UpdateDisplay();
-                                BroadcastMsg($"【事件】伸出援手：最困难的{playerInfoPanels[poorIdx].Data.playerName} 获得{aid}元救济金");
+                                BroadcastMsg(I18n.T("broadcast_charity_event", $"【事件】伸出援手：最困难的{playerInfoPanels[poorIdx].Data.playerName} 获得{aid}元救济金", ("poor", playerInfoPanels[poorIdx].Data.playerName), ("amount", aid)));
                             }
                             UpdateProsperity();
                         }
@@ -1358,7 +1383,7 @@ namespace SheNicest.UI
                         if (other >= 0)
                         {
                             ApplyEffectToPlayer(other, eventData);
-                            BroadcastMsg($"{playerInfoPanels[other].Data.playerName} 也获得声望+5");
+                            BroadcastMsg(I18n.T("broadcast_alliance_rep", $"{playerInfoPanels[other].Data.playerName} 也获得声望+5", ("player", playerInfoPanels[other].Data.playerName)));
                         }
                     }
                     else
@@ -1381,7 +1406,7 @@ namespace SheNicest.UI
                             tileIndices[tokenIndex] = leftStationIndex;
                             Vector2 pos = GetTileAnchorPos(leftStationIndex);
                             if (tokens[tokenIndex] != null) tokens[tokenIndex].anchoredPosition = pos;
-                            BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 被传送到火车站");
+                            BroadcastMsg(I18n.T("event_teleport_train", $"{playerInfoPanels[tokenIndex].Data.playerName} 被传送到火车站", ("player", playerInfoPanels[tokenIndex].Data.playerName)));
                         }
                     }
                     else if (name == "商战")
@@ -1403,7 +1428,7 @@ namespace SheNicest.UI
                     {
                         // 再投一次骰子：设置标记
                         rerollNextTurn[tokenIndex] = true;
-                        BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 可以再投一次骰子");
+                        BroadcastMsg(I18n.T("event_reroll", $"{playerInfoPanels[tokenIndex].Data.playerName} 可以再投一次骰子", ("player", playerInfoPanels[tokenIndex].Data.playerName)));
                     }
                     else if (name == "伸出援手")
                     {
@@ -1424,13 +1449,13 @@ namespace SheNicest.UI
                             {
                                 playerInfoPanels[i].Data.cash -= 200;
                                 playerInfoPanels[i].UpdateDisplay(); UpdateProsperity();
-                                BroadcastMsg($"{playerInfoPanels[i].Data.playerName} 是最富的，-200");
+                                BroadcastMsg(I18n.T("event_richest_minus200", $"{playerInfoPanels[i].Data.playerName} 是最富的，-200", ("player", playerInfoPanels[i].Data.playerName)));
                             }
                             if (w == minW)
                             {
                                 playerInfoPanels[i].Data.cash += 200;
                                 playerInfoPanels[i].UpdateDisplay(); UpdateProsperity();
-                                BroadcastMsg($"{playerInfoPanels[i].Data.playerName} 是最穷的，+200");
+                                BroadcastMsg(I18n.T("event_poorest_plus200", $"{playerInfoPanels[i].Data.playerName} 是最穷的，+200", ("player", playerInfoPanels[i].Data.playerName)));
                             }
                         }
                     }
@@ -1468,7 +1493,7 @@ namespace SheNicest.UI
             }
             if (owned.Count == 0)
             {
-                BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 没有可卖的房产");
+                BroadcastMsg(I18n.T("event_sell_none", $"{playerInfoPanels[tokenIndex].Data.playerName} 没有可卖的房产", ("player", playerInfoPanels[tokenIndex].Data.playerName)));
                 return;
             }
             int target = owned[Random.Range(0, owned.Count)];
@@ -1480,7 +1505,7 @@ namespace SheNicest.UI
             buildingData[target].ownerIndex = -2; // 回归政府所有
             UpdateBuildingSprite(target);
             playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-            BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 卖掉一块房产，获得{refund}元");
+            BroadcastMsg(I18n.T("event_sell_done", $"{playerInfoPanels[tokenIndex].Data.playerName} 卖掉一块房产，获得{refund}元", ("player", playerInfoPanels[tokenIndex].Data.playerName), ("refund", refund)));
         }
 
         /// <summary>随机选自己的房产降一级（v3移植：允许降到0级有主地）</summary>
@@ -1494,7 +1519,7 @@ namespace SheNicest.UI
             }
             if (owned.Count == 0)
             {
-                BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 没有可降级的房产");
+                BroadcastMsg(I18n.T("event_downgrade_none", $"{playerInfoPanels[tokenIndex].Data.playerName} 没有可降级的房产", ("player", playerInfoPanels[tokenIndex].Data.playerName)));
                 return;
             }
             int target = owned[Random.Range(0, owned.Count)];
@@ -1503,7 +1528,7 @@ namespace SheNicest.UI
             UpdateBuildingSprite(target);
             StartCoroutine(BuildingDowngradeAnim(target));
             playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-            BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 的一处房产降级");
+            BroadcastMsg(I18n.T("event_downgrade_done", $"{playerInfoPanels[tokenIndex].Data.playerName} 的一处房产降级", ("player", playerInfoPanels[tokenIndex].Data.playerName)));
         }
 
         /// <summary>随机获得一处房产（v3移植：商战=白送政府地 / 人脉=市价85折优先购他人房产）</summary>
@@ -1520,7 +1545,7 @@ namespace SheNicest.UI
                 }
                 if (candidates.Count == 0)
                 {
-                    BroadcastMsg("【奖励】市面上已无可获得的政府地块，商战扑空");
+                    BroadcastMsg(I18n.T("event_grab_none", "【奖励】市面上已无可获得的政府地块，商战扑空"));
                     return;
                 }
                 int target = candidates[Random.Range(0, candidates.Count)];
@@ -1529,7 +1554,7 @@ namespace SheNicest.UI
                 playerInfoPanels[tokenIndex].Data.propertyValue += buildingData[target].TotalValue;
                 UpdateBuildingSprite(target);
                 playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-                BroadcastMsg($"【奖励】{playerInfoPanels[tokenIndex].Data.playerName} 赢得一处政府地块！", BroadcastBar.P1);
+                BroadcastMsg(I18n.T("event_grab_win", $"【奖励】{playerInfoPanels[tokenIndex].Data.playerName} 赢得一处政府地块！", ("player", playerInfoPanels[tokenIndex].Data.playerName)), BroadcastBar.P1);
                 return;
             }
 
@@ -1541,7 +1566,7 @@ namespace SheNicest.UI
             }
             if (candidates.Count == 0)
             {
-                BroadcastMsg("【奖励】没有他人的房产可谈，人脉扑空");
+                BroadcastMsg(I18n.T("event_network_none", "【奖励】没有他人的房产可谈，人脉扑空"));
                 return;
             }
             int t = candidates[Random.Range(0, candidates.Count)];
@@ -1550,7 +1575,7 @@ namespace SheNicest.UI
             var pd = playerInfoPanels[tokenIndex].Data;
             if (pd.cash < price)
             {
-                BroadcastMsg("【奖励】现金不足，人脉机会溜走了");
+                BroadcastMsg(I18n.T("event_network_poor", "【奖励】现金不足，人脉机会溜走了"));
                 return;
             }
             int oldOwner = tile.ownerIndex;
@@ -1563,7 +1588,8 @@ namespace SheNicest.UI
             UpdateBuildingSprite(t);
             playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
             playerInfoPanels[oldOwner].UpdateDisplay(); UpdateProsperity();
-            BroadcastMsg($"【交易】{pd.playerName} 凭人脉以{price}元（市价85折）购得{od.playerName}的{t}号地块", BroadcastBar.P1);
+            FlyMoney(playerInfoPanels[tokenIndex].transform as RectTransform, playerInfoPanels[oldOwner].transform as RectTransform, price, playerInfoPanels[oldOwner]);
+            BroadcastMsg(I18n.T("event_network_deal", $"【交易】{pd.playerName} 凭人脉以{price}元（市价85折）购得{od.playerName}的{t}号地块", ("buyer", pd.playerName), ("price", price), ("seller", od.playerName), ("tile", t)), BroadcastBar.P1);
         }
 
         /// <summary>随机选自己的房产免费升级，满级则失效</summary>
@@ -1577,7 +1603,7 @@ namespace SheNicest.UI
             }
             if (owned.Count == 0)
             {
-                BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 没有可升级的房产");
+                BroadcastMsg(I18n.T("event_freeupgrade_none", $"{playerInfoPanels[tokenIndex].Data.playerName} 没有可升级的房产", ("player", playerInfoPanels[tokenIndex].Data.playerName)));
                 return;
             }
             int target = owned[Random.Range(0, owned.Count)];
@@ -1586,7 +1612,7 @@ namespace SheNicest.UI
             UpdateBuildingSprite(target);
             StartCoroutine(BuildingUpgradeAnim(target));
             playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-            BroadcastMsg($"【奖励】{playerInfoPanels[tokenIndex].Data.playerName} 的房产免费升级到{buildingData[target].level}级", BroadcastBar.P1);
+            BroadcastMsg(I18n.T("event_freeupgrade_done", $"【奖励】{playerInfoPanels[tokenIndex].Data.playerName} 的房产免费升级到{buildingData[target].level}级", ("player", playerInfoPanels[tokenIndex].Data.playerName), ("level", buildingData[target].level)), BroadcastBar.P1);
         }
 
         /// <summary>
@@ -1666,7 +1692,7 @@ namespace SheNicest.UI
 
             if (pd.cash < 50)
             {
-                BroadcastMsg("现金不足，无法乘坐火车");
+                BroadcastMsg(I18n.T("ui_cash_short_train", "现金不足，无法乘坐火车"));
                 yield break;
             }
 
@@ -1745,7 +1771,7 @@ namespace SheNicest.UI
                 tokens[tokenIndex].anchoredPosition = targetPos;
 
             Debug.Log($"[Train] Token{tokenIndex} teleported to tile {targetIndex} for 50");
-            BroadcastMsg($"{pd.playerName} 花费50元乘坐火车");
+            BroadcastMsg(I18n.T("event_train_ride", $"{pd.playerName} 花费50元乘坐火车", ("player", pd.playerName)));
 
             yield return new WaitForSeconds(0.5f);
         }
@@ -1791,7 +1817,8 @@ namespace SheNicest.UI
                                 pd.propertyValue += data.TotalValue; // 等级已更新为1
                                 UpdateBuildingSprite(tileIndex);
                                 playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-                                BroadcastMsg($"【交易】{pd.playerName} 购入{tileIndex}号地块（补贴价{BuildingData.BuyCost}元）", BroadcastBar.P1);
+                                FlyMoney(playerInfoPanels[tokenIndex].transform as RectTransform, tilePath[tileIndex] as RectTransform, BuildingData.BuyCost);
+                                BroadcastMsg(I18n.T("broadcast_buy_gov", $"【交易】{pd.playerName} 购入{tileIndex}号地块（补贴价{BuildingData.BuyCost}元）", ("player", pd.playerName), ("tile", tileIndex), ("price", BuildingData.BuyCost)), BroadcastBar.P1);
                                 AudioManager.Instance?.PlayBuildingUpgrade();
                             }
                         }
@@ -1803,7 +1830,7 @@ namespace SheNicest.UI
             {
                 // 自己的：可升级
                 int marketPrice = data.GetMarketPrice(currentProsperity);
-                buildingPanel.ShowOwned(data, marketPrice, playerInfoPanels[tokenIndex]?.Data?.playerName ?? $"玩家{tokenIndex}",
+                buildingPanel.ShowOwned(data, marketPrice, playerInfoPanels[tokenIndex]?.Data?.playerName ?? I18n.T("ui_player_fallback", $"玩家{tokenIndex}", ("n", tokenIndex)),
                     () => { // 升级回调
                         if (tokenIndex < playerInfoPanels.Count && playerInfoPanels[tokenIndex] != null)
                         {
@@ -1816,7 +1843,7 @@ namespace SheNicest.UI
                                 UpdateBuildingSprite(tileIndex);
                                 StartCoroutine(BuildingUpgradeAnim(tileIndex));
                                 playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-                                BroadcastMsg($"【交易】{pd.playerName} 升级{tileIndex}号地块到{data.level}级（-{BuildingData.UpgradeCost}元）", BroadcastBar.P1);
+                                BroadcastMsg(I18n.T("broadcast_upgrade_tile", $"【交易】{pd.playerName} 升级{tileIndex}号地块到{data.level}级（-{BuildingData.UpgradeCost}元）", ("player", pd.playerName), ("tile", tileIndex), ("level", data.level), ("price", BuildingData.UpgradeCost)), BroadcastBar.P1);
                                 AudioManager.Instance?.PlayBuildingUpgrade();
                             }
                         }
@@ -1830,7 +1857,7 @@ namespace SheNicest.UI
                 int marketPrice = data.GetMarketPrice(currentProsperity);
                 int rent = data.GetRent(currentProsperity);
                 string ownerName = (data.ownerIndex < playerInfoPanels.Count && playerInfoPanels[data.ownerIndex] != null)
-                    ? playerInfoPanels[data.ownerIndex].Data.playerName : $"玩家{data.ownerIndex}";
+                    ? playerInfoPanels[data.ownerIndex].Data.playerName : I18n.T("ui_player_fallback", $"玩家{data.ownerIndex}", ("n", data.ownerIndex));
 
                 buildingPanel.ShowRented(data, marketPrice, ownerName,
                     () => { // 支付租金回调
@@ -1841,11 +1868,12 @@ namespace SheNicest.UI
                             var ownerData = playerInfoPanels[data.ownerIndex].Data;
                             payerData.cash -= rent;
                             ownerData.cash += rent;
+                            FlyMoney(playerInfoPanels[tokenIndex].transform as RectTransform, playerInfoPanels[data.ownerIndex].transform as RectTransform, rent, playerInfoPanels[data.ownerIndex]);
                             AudioManager.Instance?.PlayCoin();
                             playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
                             playerInfoPanels[data.ownerIndex].UpdateDisplay(); UpdateProsperity();
                             Debug.Log($"[Building] Token{tokenIndex} paid {rent} rent to Token{data.ownerIndex}");
-                            BroadcastMsg($"{playerInfoPanels[tokenIndex].Data.playerName} 向 {playerInfoPanels[data.ownerIndex].Data.playerName} 支付租金{rent}元");
+                            BroadcastMsg(I18n.T("broadcast_rent", $"{playerInfoPanels[tokenIndex].Data.playerName} 向 {playerInfoPanels[data.ownerIndex].Data.playerName} 支付租金{rent}元", ("payer", playerInfoPanels[tokenIndex].Data.playerName), ("rent", rent), ("owner", playerInfoPanels[data.ownerIndex].Data.playerName)));
                         }
                     },
                     () => { // Bargain回调
@@ -1883,7 +1911,8 @@ namespace SheNicest.UI
                     data.ownerIndex = tokenIndex;
                     UpdateBuildingSprite(tileIndex);
                     playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-                    BroadcastMsg($"【交易】{pd.playerName} 购入了建筑");
+                    FlyMoney(playerInfoPanels[tokenIndex].transform as RectTransform, tilePath[tileIndex] as RectTransform, BuildingData.BuyCost);
+                    BroadcastMsg(I18n.T("broadcast_buy", $"【交易】{pd.playerName} 购入了建筑", ("player", pd.playerName)));
                     AudioManager.Instance?.PlayBuildingUpgrade();
                 }
             }
@@ -1898,7 +1927,7 @@ namespace SheNicest.UI
                     UpdateBuildingSprite(tileIndex);
                     StartCoroutine(BuildingUpgradeAnim(tileIndex));
                     playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
-                    BroadcastMsg($"【交易】{pd.playerName} 升级建筑到{data.level}级");
+                    BroadcastMsg(I18n.T("broadcast_upgrade", $"【交易】{pd.playerName} 升级建筑到{data.level}级", ("player", pd.playerName), ("level", data.level)));
                     AudioManager.Instance?.PlayBuildingUpgrade();
                 }
             }
@@ -1923,10 +1952,11 @@ namespace SheNicest.UI
                     int rent = data.GetRent(currentProsperity);
                     pd.cash -= rent;
                     ownerData.cash += rent;
+                    FlyMoney(playerInfoPanels[tokenIndex].transform as RectTransform, playerInfoPanels[data.ownerIndex].transform as RectTransform, rent, playerInfoPanels[data.ownerIndex]);
                     AudioManager.Instance?.PlayCoin();
                     playerInfoPanels[tokenIndex].UpdateDisplay(); UpdateProsperity();
                     playerInfoPanels[data.ownerIndex].UpdateDisplay(); UpdateProsperity();
-                    BroadcastMsg($"【租金】{pd.playerName} 向 {ownerData.playerName} 支付租金{rent}元", BroadcastBar.P2);
+                    BroadcastMsg(I18n.T("broadcast_rent", $"【租金】{pd.playerName} 向 {ownerData.playerName} 支付租金{rent}元", ("payer", pd.playerName), ("rent", rent), ("owner", ownerData.playerName)), BroadcastBar.P2);
                 }
             }
 
@@ -2182,7 +2212,7 @@ namespace SheNicest.UI
                     if (infamous && !surchargeWarned[i])
                     {
                         surchargeWarned[i] = true;
-                        BroadcastMsg($"【警告】{pd.playerName} 声望扫地，萧条中被民众抵制，维持费翻倍！", BroadcastBar.P0);
+                        BroadcastMsg(I18n.T("broadcast_surcharge", $"【警告】{pd.playerName} 声望扫地，萧条中被民众抵制，维持费翻倍！", ("player", pd.playerName)), BroadcastBar.P0);
                     }
                 }
                 else
@@ -2194,13 +2224,13 @@ namespace SheNicest.UI
             if (crisis)
             {
                 if (eatenTotal > 0)
-                    BroadcastMsg($"【危机】市政征收维持费；通胀吞噬现金{eatenTotal}元（{string.Join("、", eatenNames)}）", BroadcastBar.P1);
+                    BroadcastMsg(I18n.T("broadcast_crisis_fee_summary", $"【危机】市政征收维持费；通胀吞噬现金{eatenTotal}元（{string.Join("、", eatenNames)}）", ("total", eatenTotal), ("names", string.Join("、", eatenNames))), BroadcastBar.P1);
                 else
-                    BroadcastMsg("【危机】萧条持续，市政征收维持费", BroadcastBar.P1);
+                    BroadcastMsg(I18n.T("broadcast_crisis_fee_only", "【危机】萧条持续，市政征收维持费", ("amount", 30)), BroadcastBar.P1);
             }
             else if (sprint)
             {
-                BroadcastMsg("【繁荣】经济腾飞，全城分红20元/人", BroadcastBar.P1);
+                BroadcastMsg(I18n.T("broadcast_sprint_dividend", "【繁荣】经济腾飞，全城分红20元/人"), BroadcastBar.P1);
             }
         }
 
@@ -2233,7 +2263,7 @@ namespace SheNicest.UI
                 if (w < minW) { minW = w; minIdx = i; }
             }
             if (minIdx >= 0)
-                bottleneckText.text = $"短板：{playerInfoPanels[minIdx].Data.playerName}（财富{minW}）";
+                bottleneckText.text = I18n.T("status_shortboard", $"短板：{playerInfoPanels[minIdx].Data.playerName}（财富{minW}）", ("name", playerInfoPanels[minIdx].Data.playerName), ("wealth", minW));
         }
 
         // ==================== 繁荣值系统 ====================
@@ -2258,17 +2288,17 @@ namespace SheNicest.UI
             if (prosperityText != null)
             {
                 // v2.2 状态面板：指数+箭头+阶段标签+本阶段规则小字（两行）
-                string phaseLabel = currentPhase == GamePhase.Crisis ? "危机区"
-                                  : currentPhase == GamePhase.Sprint ? "冲刺区"
-                                  : "常规区";
-                string rule = currentPhase == GamePhase.Crisis ? "维持费 -30/回合（恶名 -60）"
-                            : currentPhase == GamePhase.Sprint ? "分红 +20/回合"
+                string phaseLabel = currentPhase == GamePhase.Crisis ? I18n.T("status_phase_crisis", "危机区")
+                                  : currentPhase == GamePhase.Sprint ? I18n.T("status_phase_sprint", "冲刺区")
+                                  : I18n.T("status_phase_normal", "常规区");
+                string rule = currentPhase == GamePhase.Crisis ? I18n.T("status_rule_crisis", "维持费 -30/回合（恶名 -60）")
+                            : currentPhase == GamePhase.Sprint ? I18n.T("status_rule_sprint", "分红 +20/回合")
                             : "";
                 string arrow = lastProsperityShown >= 0
                     ? (currentProsperity > lastProsperityShown ? " ▲" : currentProsperity < lastProsperityShown ? " ▼" : "")
                     : "";
                 string ruleLine = string.IsNullOrEmpty(rule) ? "" : "\n" + rule;
-                prosperityText.text = $"繁荣指数 {currentProsperity}{arrow} ▏{phaseLabel}{ruleLine}";
+                prosperityText.text = I18n.T("ui_prosperity", $"繁荣指数 {currentProsperity}{arrow} ▏{phaseLabel}{ruleLine}", ("value", currentProsperity), ("arrow", arrow), ("phase", phaseLabel), ("rule", ruleLine));
                 lastProsperityShown = currentProsperity;
             }
 
@@ -2306,24 +2336,24 @@ namespace SheNicest.UI
             if (!tutorialBroadcastShown)
             {
                 tutorialBroadcastShown = true;
-                BroadcastMsg("【繁荣】本城繁荣取决于最穷玩家的财富。别让任何人破产——繁荣到110，大家共赢！", BroadcastBar.P1, 4f);
+                BroadcastMsg(I18n.T("broadcast_tutorial", "【繁荣】本城繁荣取决于最穷玩家的财富。别让任何人破产——繁荣到110，大家共赢！"), BroadcastBar.P1, 4f);
             }
 
             // 阈值告警（P0）：跨越30向下 / 跨越90向上
             bool crossed30Down = oldVal >= 30 && newVal < 30;
             bool crossed90Up = oldVal < 90 && newVal >= 90;
             if (crossed30Down)
-                BroadcastMsg($"【警告】繁荣跌破30！城市衰退边缘——最穷玩家的财富正在拖垮全城！", BroadcastBar.P0);
+                BroadcastMsg(I18n.T("broadcast_warning_below30", "【警告】繁荣跌破30！城市衰退边缘——最穷玩家的财富正在拖垮全城！"), BroadcastBar.P0);
             else if (crossed90Up)
-                BroadcastMsg($"【繁荣】繁荣突破90！距离全员胜利（110）只差一步，别松手！", BroadcastBar.P0);
+                BroadcastMsg(I18n.T("broadcast_warning_above90", "【繁荣】繁荣突破90！距离全员胜利（110）只差一步，别松手！"), BroadcastBar.P0);
 
             // 常规变化（P2，|Δ|≥5）——v2.2 B4：每回合限流一条（繁荣逐笔刷新曾刷屏）
             else if (Mathf.Abs(delta) >= 5 && currentRound != lastProsperityBroadcastRound)
             {
                 string arrow = delta > 0 ? $"▲{delta}" : $"▼{Mathf.Abs(delta)}";
-                string trend = delta > 0 ? "全城资产升值！" : "地价随之下跌…";
+                string trend = delta > 0 ? I18n.T("broadcast_trend_up", "全城资产升值！") : I18n.T("broadcast_trend_down", "地价随之下跌…");
                 lastProsperityBroadcastRound = currentRound;
-                BroadcastMsg($"【繁荣】城市繁荣 {oldVal} → {newVal}（{arrow}），{trend}", BroadcastBar.P2);
+                BroadcastMsg(I18n.T(delta > 0 ? "broadcast_prosperity_up" : "broadcast_prosperity_down", $"【繁荣】城市繁荣 {oldVal} → {newVal}（{arrow}），{trend}", ("old", oldVal), ("new", newVal), ("delta", (delta > 0 ? "▲" : "▼") + Mathf.Abs(delta).ToString())), BroadcastBar.P2);
             }
             lastProsperity = newVal;
         }
@@ -2342,10 +2372,10 @@ namespace SheNicest.UI
                 switch (phase)
                 {
                     case GamePhase.Crisis:
-                        BroadcastMsg("【警告】城市进入衰退期！市政启动救市：济贫加码、灾祸减少", BroadcastBar.P0);
+                        BroadcastMsg(I18n.T("broadcast_phase_crisis", "【警告】城市进入衰退期！市政启动救市：济贫加码、灾祸减少"), BroadcastBar.P0);
                         break;
                     case GamePhase.Sprint:
-                        BroadcastMsg("【繁荣】经济腾飞！城市进入冲刺期，机会与风险并存", BroadcastBar.P0);
+                        BroadcastMsg(I18n.T("broadcast_phase_sprint", "【繁荣】经济腾飞！城市进入冲刺期，机会与风险并存"), BroadcastBar.P0);
                         break;
                 }
             }
@@ -2401,7 +2431,7 @@ namespace SheNicest.UI
                 if (!rescueDeniedShown[poorest])
                 {
                     rescueDeniedShown[poorest] = true;
-                    BroadcastMsg($"【传闻】有人对 {playerInfoPanels[poorest].Data.playerName} 的困境视而不见……", BroadcastBar.P2);
+                    BroadcastMsg(I18n.T("broadcast_rescue_denied", $"【传闻】有人对 {playerInfoPanels[poorest].Data.playerName} 的困境视而不见……", ("player", playerInfoPanels[poorest].Data.playerName)), BroadcastBar.P2);
                 }
                 return;
             }
@@ -2430,7 +2460,8 @@ namespace SheNicest.UI
             playerInfoPanels[rescuerIndex].UpdateDisplay(); UpdateProsperity();
             playerInfoPanels[poorest].UpdateDisplay(); UpdateProsperity();
             AudioManager.Instance?.PlayCoin();
-            BroadcastMsg($"【交易】{rescuer.playerName} 以{price}元买下 {poorData.playerName} 的一处地产——「我帮你渡过难关」", BroadcastBar.P1, 4f);
+            FlyMoney(playerInfoPanels[rescuerIndex].transform as RectTransform, playerInfoPanels[poorest].transform as RectTransform, price, playerInfoPanels[poorest]);
+            BroadcastMsg(I18n.T("broadcast_persona_rescue", $"【交易】{rescuer.playerName} 以{price}元买下 {poorData.playerName} 的一处地产——「我帮你渡过难关」", ("rescuer", rescuer.playerName), ("price", price), ("poor", poorData.playerName)), BroadcastBar.P1, 4f);
             Debug.Log($"[Rescue] {rescuer.playerName}({rescuer.personaName}) rescued {poorData.playerName} with {price}");
         }
 
@@ -2438,7 +2469,7 @@ namespace SheNicest.UI
         private void TryResolveBankruptcy(int pi)
         {
             var pd = playerInfoPanels[pi].Data;
-            BroadcastMsg($"【警告】{pd.playerName} 资不抵债！强制拍卖名下地产…", BroadcastBar.P0);
+            BroadcastMsg(I18n.T("broadcast_bankrupt_warning", $"【警告】{pd.playerName} 资不抵债！强制拍卖名下地产…", ("player", pd.playerName)), BroadcastBar.P0);
 
             int sold = 0;
             while (pd.cash < 0)
@@ -2458,7 +2489,7 @@ namespace SheNicest.UI
                 tile.level = 0;
                 UpdateBuildingSprite(ownedTile);
                 sold++;
-                BroadcastMsg($"【警告】{pd.playerName} 的地产被以 {salePrice}元 强制拍卖");
+                BroadcastMsg(I18n.T("broadcast_bankrupt_sold", $"【警告】{pd.playerName} 的地产被以 {salePrice}元 强制拍卖", ("player", pd.playerName), ("price", salePrice)));
             }
             playerInfoPanels[pi].UpdateDisplay();
 
@@ -2473,17 +2504,17 @@ namespace SheNicest.UI
                 playerInfoPanels[pi].UpdateDisplay();
                 // v2.2：败局按声望点名（恶名者"众叛亲离"变体）
                 string outMsg = pd.reputation < 35
-                    ? $"【警告】{pd.playerName} 破产出局——为富不仁，众叛亲离，城市随之崩塌……"
-                    : $"【警告】{pd.playerName} 破产出局——城市失去了最后的经济支柱…";
+                    ? I18n.T("broadcast_bankrupt_infamous", $"【警告】{pd.playerName} 破产出局——为富不仁，众叛亲离，城市随之崩塌……", ("player", pd.playerName))
+                    : I18n.T("broadcast_bankrupt_out", $"【警告】{pd.playerName} 破产出局——城市失去了最后的经济支柱…", ("player", pd.playerName));
                 BroadcastMsg(outMsg, BroadcastBar.P0);
                 string endMsg = pd.reputation < 35
-                    ? $"{pd.playerName} 破产出局——为富不仁，众叛亲离，城市随之崩塌……所有玩家失败！"
-                    : $"{pd.playerName} 破产出局，城市随之崩塌——所有玩家失败！";
+                    ? I18n.T("game_over_bankrupt_infamous", $"{pd.playerName} 破产出局——为富不仁，众叛亲离，城市随之崩塌……所有玩家失败！", ("player", pd.playerName))
+                    : I18n.T("game_over_bankrupt", $"{pd.playerName} 破产出局，城市随之崩塌——所有玩家失败！", ("player", pd.playerName));
                 EndGame(endMsg, false);
             }
             else if (sold > 0)
             {
-                BroadcastMsg($"{pd.playerName} 拍卖{sold}处地产后渡过难关，现金 {pd.cash}元", BroadcastBar.P1);
+                BroadcastMsg(I18n.T("broadcast_bankrupt_survived", $"{pd.playerName} 拍卖{sold}处地产后渡过难关，现金 {pd.cash}元", ("player", pd.playerName), ("count", sold), ("cash", pd.cash)), BroadcastBar.P1);
             }
         }
 
@@ -2494,12 +2525,12 @@ namespace SheNicest.UI
         {
             if (currentProsperity <= 20)
             {
-                EndGame("繁荣值过低，所有玩家失败！", false);
+                EndGame(I18n.T("game_over_lose", "繁荣值过低，所有玩家失败！"), false);
                 return true;
             }
             if (currentProsperity >= WinLine)
             {
-                EndGame("繁荣值达到110，所有玩家大获全胜！", true);
+                EndGame(I18n.T("game_over_win", "繁荣值达到110，所有玩家大获全胜！"), true);
                 return true;
             }
             return false;
@@ -2829,7 +2860,7 @@ namespace SheNicest.UI
             }
 
             UpdateProsperity();
-            BroadcastMsg($"读档成功，从第{currentRound}回合继续");
+            BroadcastMsg(I18n.T("broadcast_load_save", $"读档成功，从第{currentRound}回合继续", ("round", currentRound)));
 
             // 续跑回合循环
             if (currentTurn == 0)
@@ -2849,7 +2880,7 @@ namespace SheNicest.UI
             if (rep == 0) return;
             pd.reputation = Mathf.Clamp(pd.reputation + rep, 0, 100);
             playerInfoPanels[playerIdx].UpdateDisplay(); UpdateProsperity();
-            BroadcastMsg($"{pd.playerName} ({BargainState.cardNames[cardIdx]}) 声望{(rep >= 0 ? "+" : "")}{rep}");
+            BroadcastMsg(I18n.T("broadcast_rep_change", $"{pd.playerName} ({BargainState.cardNames[cardIdx]}) 声望{(rep >= 0 ? "+" : "")}{rep}", ("player", pd.playerName), ("delta", (rep >= 0 ? "+" : "") + rep), ("card", I18n.T("card_" + cardIdx, BargainState.cardNames[cardIdx]))));
         }
 
         // ===== 测试模式：跨场景Bargain测试状态（Bargain为全场景切换，实例字段会销毁，进度需静态保存） =====
@@ -2945,15 +2976,15 @@ namespace SheNicest.UI
             BargainData.tileIndex = tileIndex;
             BargainData.playerIsBuyer = (tokenIndex == 0);
             BargainData.bargainActive = true;
-            BargainData.sellerName = playerInfoPanels[ownerIndex]?.Data?.playerName ?? $"玩家{ownerIndex}";
-            BargainData.buyerName = playerInfoPanels[tokenIndex]?.Data?.playerName ?? $"玩家{tokenIndex}";
+            BargainData.sellerName = playerInfoPanels[ownerIndex]?.Data?.playerName ?? I18n.T("ui_player_fallback", $"玩家{ownerIndex}", ("n", ownerIndex));
+            BargainData.buyerName = playerInfoPanels[tokenIndex]?.Data?.playerName ?? I18n.T("ui_player_fallback", $"玩家{tokenIndex}", ("n", tokenIndex));
             BargainData.sellerCardIndex = -1;
             BargainData.buyerCardIndex = -1;
             BargainData.tileName = tilePath != null && tileIndex >= 0 && tileIndex < tilePath.Count && tilePath[tileIndex] != null
                 ? $"{tilePath[tileIndex].name}（{data.level}级）"
                 : "房产";
 
-            BroadcastMsg("进入Bargain...");
+            BroadcastMsg(I18n.T("ui_enter_bargain", "进入Bargain..."));
             AudioManager.Instance?.PlayRandomBargainBGM();
 
             // 保存游戏状态
@@ -3047,13 +3078,16 @@ namespace SheNicest.UI
                         if (finalPrice < marketPrice)
                         {
                             int savedPct = Mathf.RoundToInt((marketPrice - finalPrice) * 100f / Mathf.Max(1, marketPrice));
-                            dealNote = $"市价{marketPrice}元，砍价省了{savedPct}%";
+                            dealNote = I18n.T("bargain_note_saved", $"市价{marketPrice}元，砍价省了{savedPct}%", ("market", marketPrice), ("pct", savedPct));
                         }
                         else
                         {
-                            dealNote = $"高于市价{marketPrice}元，高价接盘…";
+                            dealNote = I18n.T("bargain_note_overpaid", $"高于市价{marketPrice}元，高价接盘…", ("market", marketPrice));
                         }
-                        BroadcastMsg($"【交易】{buyerData.playerName} 以{finalPrice}元购得 {BargainData.tileName}（原属 {sellerData?.playerName ?? "政府"}，{dealNote}）", BroadcastBar.P1);
+                        FlyMoney(playerInfoPanels[buyerIndex].transform as RectTransform,
+                                 sellerIndex >= 0 ? playerInfoPanels[sellerIndex].transform as RectTransform : tilePath[tileIndex] as RectTransform,
+                                 finalPrice, sellerIndex >= 0 ? playerInfoPanels[sellerIndex] : null);
+                        BroadcastMsg(I18n.T("broadcast_deal_done", $"【交易】{buyerData.playerName} 以{finalPrice}元购得 {BargainData.tileName}（原属 {sellerData?.playerName ?? "政府"}，{dealNote}）", ("buyer", buyerData.playerName), ("price", finalPrice), ("tile", BargainData.tileName), ("seller", sellerData?.playerName ?? I18n.T("ui_gov", "政府")), ("note", dealNote)), BroadcastBar.P1);
                     }
                 }
             }
@@ -3077,7 +3111,7 @@ namespace SheNicest.UI
                             playerInfoPanels[sellerIndex].UpdateDisplay(); UpdateProsperity();
                         }
                         playerInfoPanels[buyerIndex].UpdateDisplay(); UpdateProsperity();
-                        BroadcastMsg($"Bargain失败，{buyerData.playerName} 向 {sellerData?.playerName ?? "政府"} 支付 {BargainData.tileName} 租金{rent}元");
+                        BroadcastMsg(I18n.T("broadcast_bargain_lose2", $"Bargain失败，{buyerData.playerName} 向 {sellerData?.playerName ?? "政府"} 支付 {BargainData.tileName} 租金{rent}元", ("buyer", buyerData.playerName), ("seller", sellerData?.playerName ?? I18n.T("ui_gov", "政府")), ("tile", BargainData.tileName), ("rent", rent)));
                     }
                 }
             }
@@ -3094,7 +3128,7 @@ namespace SheNicest.UI
                     // 第一次Bargain（AI买玩家房产）已结算 → 发起第二次（玩家买AI房产）
                     TestBargainState.phase = 2;
                     yield return new WaitForSeconds(turnDelay);
-                    BroadcastMsg("[测试] 第二次Bargain：玩家购买AI房产");
+                    BroadcastMsg(I18n.T("ui_test_bargain_2", "[测试] 第二次Bargain：玩家购买AI房产"));
                     var aiData = buildingData[TestBargainState.aiTileIndex];
                     StartBargain(TestBargainState.aiTileIndex, 0, aiData); // 玩家作为买方
                     yield break;
@@ -3105,7 +3139,7 @@ namespace SheNicest.UI
                     TestBargainState.active = false;
                     TestBargainState.phase = 0;
                     yield return new WaitForSeconds(turnDelay);
-                    EndGame("测试模式：两次Bargain流程完成，游戏结束", true);
+                    EndGame(I18n.T("ui_test_bargain_done", "测试模式：两次Bargain流程完成，游戏结束"), true);
                     yield break;
                 }
             }
@@ -3137,7 +3171,17 @@ namespace SheNicest.UI
         private readonly bool[] surchargeWarned = new bool[4];   // 恶名加征播报去重（每局每人一次）
         private int lastProsperityBroadcastRound = -1;           // 繁荣播报每回合限流（B4）
         private int lastProsperityShown = -1;                    // 状态面板箭头基准
-        private readonly bool[] rescueDeniedShown = new bool[4]; // M5：救援拒绝传闻去重
+        private readonly bool[] rescueDeniedShown = new bool[4];
+
+        // 视效v2：金币飞行/3D骰子
+        private Canvas _fxCanvas;
+        private Canvas FxCanvas { get { if (_fxCanvas == null) _fxCanvas = FindObjectOfType<Canvas>(); return _fxCanvas; } }
+
+        /// <summary>视效v2：金币飞行（from→to，按金额决定枚数；到达后目标面板脉冲）</summary>
+        private void FlyMoney(RectTransform from, RectTransform to, int amount, PlayerInfoPanel pulseTarget = null)
+        {
+            CoinFlightFX.Fly(FxCanvas, from, to, amount, pulseTarget == null ? null : pulseTarget.Pulse);
+        } // M5：救援拒绝传闻去重
         private Text bottleneckText;                             // 短板行（回合末刷新）
 
         /// <summary>危机维持费（恶名者翻倍）：声望<45 民意抵制</summary>

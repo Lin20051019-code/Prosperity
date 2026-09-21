@@ -235,7 +235,10 @@ namespace SheNicest.UI
                 string adv = FormatPercent(firstRoundAdvantage[i]);
                 string rate = FormatPercent(priceChangeRate[i]);
                 string rep = reputationChange[i] >= 0 ? $"+{reputationChange[i]}" : $"{reputationChange[i]}";
-                text.text = $"{cardNames[i]}\n首轮优势: {adv}\n改价幅度: {rate}\n声望: {rep}";
+                text.text = $"{I18n.T("card_" + i, cardNames[i])}\n" +
+                            $"{I18n.T("card_adv", $"首轮优势: {adv}", ("adv", adv))}\n" +
+                            $"{I18n.T("card_rate", $"改价幅度: {rate}", ("rate", rate))}\n" +
+                            $"{I18n.T("card_rep", $"声望: {rep}", ("rep", rep))}";
 
                 textObj.SetActive(false);
                 cardInfoTexts.Add(textObj);
@@ -401,11 +404,11 @@ namespace SheNicest.UI
         private void UpdateBargainDisplay()
         {
             if (roundText != null)
-                roundText.text = $"第{currentRound}轮";
+                roundText.text = I18n.T("bargain_round_no", $"第{currentRound}轮", ("n", currentRound));
             if (sellerOfferText != null)
-                sellerOfferText.text = $"卖方({sellerName}): {Mathf.RoundToInt(sellerOffer)}元";
+                sellerOfferText.text = I18n.T("bargain_seller_offer", $"卖方({sellerName}): {Mathf.RoundToInt(sellerOffer)}元", ("name", sellerName), ("offer", Mathf.RoundToInt(sellerOffer)));
             if (buyerOfferText != null)
-                buyerOfferText.text = $"买方({buyerName}): {Mathf.RoundToInt(buyerOffer)}元";
+                buyerOfferText.text = I18n.T("bargain_buyer_offer", $"买方({buyerName}): {Mathf.RoundToInt(buyerOffer)}元", ("name", buyerName), ("offer", Mathf.RoundToInt(buyerOffer)));
 
             // 检查是否重叠
             bool overlap = CheckOverlap();
@@ -440,7 +443,7 @@ namespace SheNicest.UI
                     else
                         previewOffer = sellerOffer + sellerDiff * (factor + playerRate);
 
-                    string role = isPlayerBuyer ? "买" : "卖";
+                    string role = isPlayerBuyer ? I18n.T("bargain_role_buy", "买") : I18n.T("bargain_role_sell", "卖");
                     offerButtonTexts[i].text = $"{role}{Mathf.RoundToInt(previewOffer)}元";
                 }
             }

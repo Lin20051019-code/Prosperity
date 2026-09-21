@@ -7,8 +7,9 @@ using UnityEngine.SceneManagement;
 namespace SheNicest.UI
 {
     /// <summary>
-    /// 报价场景控制器：3轮报价，成交或失败后加载BargainScene_Result。
-    /// v3移植：台词池分阶段台词+表情差分+说话弹跳；保留防重入与台词框位置修复。
+    /// 报价场景控制器：3轮报价，成交或失败后加载讨价还价_结果。
+    /// UI风格：P5式谈判演出——黑色斜切面板 + 彩色角标 + 打字机逐字 + 立绘弹跳 + 数字闪色。
+    /// v4.2合并：P5演出（Mac侧）+ 防重入/防连点/幂等结算（团队侧）+ 全量i18n。
     /// </summary>
     public class BargainOfferController : MonoBehaviour
     {
@@ -29,22 +30,49 @@ namespace SheNicest.UI
         [SerializeField] private Text dialogText;
 
         private Coroutine dialogCoroutine;
-        private bool offerBusy; // 防连点：同一时间只允许一个报价协程
-        private bool resultDecided; // 结果已判定后禁止再报价（场景切换窗口内重入会改写已判定结果）
+        private bool offerBusy;      // v4.2 防连点：同一时间只允许一个报价协程（团队移植）
+        private bool resultDecided; // v4.2 防重入：结果已判定后禁止再报价（场景切换窗口内重入会改写结果）
 
-        // 表情差分：key=(角色索引, 情绪)，情绪 0平1怒2惊3得意；0用场景原始立绘
+        // ===== P5 UI 动态元素 =====
+        private Text speakerTag;              // 说话人名角标
+        private Image speakerTagBg;           // 角标底色
+        private Coroutine typewriterCoroutine;
+        private Coroutine punchCoroutine;
+
+        // ===== 颜色系统（角色专属色 = 撕纸剪影色） =====
+        private static readonly Color[] CharColors =
+        {
+            new Color(0.15f, 0.55f, 0.12f),  // 莉兹·绿
+            new Color(0.12f, 0.20f, 0.55f),  // 罗斯韦尔·蓝
+            new Color(0.45f, 0.45f, 0.15f),  // 露丝·橄榄
+            new Color(0.65f, 0.12f, 0.10f),  // 徐丰·红
+        };
+        private static readonly string[] CharColorHex =
+        {
+            "#268C1F", "#1F338C", "#737326", "#A61E19",
+        };
+
+        // 表情差分
         private readonly Dictionary<(int, int), Sprite> expressionSprites = new Dictionary<(int, int), Sprite>();
         private readonly Dictionary<int, Sprite> baseSprites = new Dictionary<int, Sprite>();
+
+        // 上一次报价缓存（用于数字闪色检测）
+        private float lastSellerOffer = -1f;
+        private float lastBuyerOffer = -1f;
 
         private void Start()
         {
             BargainState.LoadDialogs();
 
-            // 运行时隐藏对话框（编辑器中保持可见便于调整）
+            // 运行时隐藏对话框（编辑器中保持可见便于调整）——v4.2团队移植
             if (dialogBox != null)
                 dialogBox.SetActive(false);
 
             SetupPortraits();
+
+            // P5风格改造（带保护，失败不阻塞游戏逻辑）
+            try { SetupP5DialogStyle(); }
+            catch (System.Exception e) { Debug.LogWarning($"[P5] Style setup skipped: {e.Message}"); }
 
             for (int i = 0; i < offerButtons.Count; i++)
             {
@@ -53,11 +81,8 @@ namespace SheNicest.UI
                     offerButtons[i].onClick.AddListener(() => SelectOffer(index));
             }
 
-            // 计算首轮报价
             BargainState.CalculateFirstRoundOffers();
             UpdateBargainDisplay();
-
-            // 显示首轮对话
             StartCoroutine(ShowFirstRoundDialog());
         }
 
@@ -68,22 +93,213 @@ namespace SheNicest.UI
                 var p = characterPortraits[i];
                 if (p == null) continue;
                 p.gameObject.SetActive(false);
-                if (!baseSprites.ContainsKey(i)) baseSprites[i] = p.sprite; // 记录场景原始立绘，作为情绪0
+                if (!baseSprites.ContainsKey(i)) baseSprites[i] = p.sprite;
             }
-            if (BargainState.sellerIndex >= 0 && BargainState.sellerIndex < characterPortraits.Count && characterPortraits[BargainState.sellerIndex] != null)
-                characterPortraits[BargainState.sellerIndex].gameObject.SetActive(true);
-            if (BargainState.buyerIndex >= 0 && BargainState.buyerIndex < characterPortraits.Count && characterPortraits[BargainState.buyerIndex] != null)
-                characterPortraits[BargainState.buyerIndex].gameObject.SetActive(true);
+
+            int playerIdx = 0;
+            int aiIdx = -1;
+            if (BargainState.sellerIndex != 0 && BargainState.sellerIndex >= 0) aiIdx = BargainState.sellerIndex;
+            if (BargainState.buyerIndex != 0 && BargainState.buyerIndex >= 0) aiIdx = BargainState.buyerIndex;
+
+            if (BargainState.isAIVsAI)
+            {
+                if (BargainState.sellerIndex < characterPortraits.Count && characterPortraits[BargainState.sellerIndex] != null)
+                {
+                    var sp = characterPortraits[BargainState.sellerIndex];
+                    sp.gameObject.SetActive(true);
+                    sp.rectTransform.anchoredPosition = new Vector2(-300, 300);
+                }
+                if (BargainState.buyerIndex < characterPortraits.Count && characterPortraits[BargainState.buyerIndex] != null)
+                {
+                    var bp = characterPortraits[BargainState.buyerIndex];
+                    bp.gameObject.SetActive(true);
+                    bp.rectTransform.anchoredPosition = new Vector2(300, 300);
+                }
+                return;
+            }
+
+            // 玩家恒在下、AI恒在上
+            if (playerIdx < characterPortraits.Count && characterPortraits[playerIdx] != null)
+            {
+                var pp = characterPortraits[playerIdx];
+                pp.gameObject.SetActive(true);
+                pp.rectTransform.anchoredPosition = BargainState.isPlayerBuyer
+                    ? new Vector2(-350, -500) : new Vector2(350, -500);
+                pp.rectTransform.localScale = BargainState.isPlayerBuyer ? Vector3.one : new Vector3(-1, 1, 1);
+            }
+            if (aiIdx >= 0 && aiIdx < characterPortraits.Count && characterPortraits[aiIdx] != null)
+            {
+                var ap = characterPortraits[aiIdx];
+                ap.gameObject.SetActive(true);
+                ap.rectTransform.anchoredPosition = (aiIdx == BargainState.buyerIndex)
+                    ? new Vector2(300, 500) : new Vector2(-300, 500);
+                ap.rectTransform.localScale = (aiIdx == BargainState.buyerIndex)
+                    ? new Vector3(-1, 1, 1) : Vector3.one;
+            }
         }
+
+        // ==================== P5 对话框 ====================
+
+        /// <summary>P5风格改造：把现有 dialogBox 改成黑色斜切面板 + 说话人彩色角标。通过代码动态创建，不改场景。</summary>
+        private void SetupP5DialogStyle()
+        {
+            if (dialogBox == null) return;
+            var rt = dialogBox.GetComponent<RectTransform>();
+
+            // 1) 面板底色改为黑色半透明
+            var img = dialogBox.GetComponent<Image>();
+            if (img != null)
+                img.color = new Color(0.05f, 0.02f, 0.05f, 0.92f);
+
+            // 2) 添加左侧彩色竖条（说话人色条）
+            var colorBar = new GameObject("SpeakerColorBar");
+            colorBar.transform.SetParent(dialogBox.transform, false);
+            var barImg = colorBar.AddComponent<Image>();
+            barImg.raycastTarget = false;
+            var barRt = colorBar.GetComponent<RectTransform>();
+            barRt.anchorMin = new Vector2(0, 0);
+            barRt.anchorMax = new Vector2(0, 1);
+            barRt.pivot = new Vector2(0, 0.5f);
+            barRt.anchoredPosition = Vector2.zero;
+            barRt.sizeDelta = new Vector2(6, 0);
+
+            // 3) 创建说话人名角标（挂在面板上方）
+            var tagObj = new GameObject("SpeakerTag");
+            tagObj.transform.SetParent(dialogBox.transform, false);
+            speakerTagBg = tagObj.AddComponent<Image>();
+            speakerTagBg.raycastTarget = false;
+            var tagRt = tagObj.GetComponent<RectTransform>();
+            tagRt.anchorMin = new Vector2(0, 1);
+            tagRt.anchorMax = new Vector2(0, 1);
+            tagRt.pivot = new Vector2(0, 1);
+            tagRt.anchoredPosition = new Vector2(15, -5);
+            tagRt.sizeDelta = new Vector2(200, 36);
+
+            var tagTxtObj = new GameObject("SpeakerTagText");
+            tagTxtObj.transform.SetParent(tagObj.transform, false);
+            speakerTag = tagTxtObj.AddComponent<Text>();
+            speakerTag.font = GetSafeFontLocal();
+            speakerTag.fontSize = 22;
+            speakerTag.fontStyle = FontStyle.Bold;
+            speakerTag.alignment = TextAnchor.MiddleCenter;
+            speakerTag.color = Color.white;
+            speakerTag.raycastTarget = false;
+            speakerTag.rectTransform.anchorMin = Vector2.zero;
+            speakerTag.rectTransform.anchorMax = Vector2.one;
+            speakerTag.rectTransform.offsetMin = Vector2.zero;
+            speakerTag.rectTransform.offsetMax = Vector2.zero;
+
+            // 4) 对话文字改为白色+描边
+            if (dialogText != null)
+            {
+                dialogText.color = Color.white;
+                var outline = dialogText.gameObject.GetComponent<Outline>();
+                if (outline == null) outline = dialogText.gameObject.AddComponent<Outline>(); // 修复：返回值必须赋回（原代码漏赋值→空引用→P5样式被跳过）
+                outline.effectColor = new Color(0, 0, 0, 0.8f);
+                outline.effectDistance = new Vector2(1.5f, 1.5f);
+                dialogText.gameObject.transform.SetAsLastSibling();
+            }
+        }
+
+        /// <summary>安全获取字体：优先项目像素字体VonwaonBitmap（含中文），再回退内置字体</summary>
+        private static Font _safeFont;
+        private static Font GetSafeFontLocal()
+        {
+            if (_safeFont != null) return _safeFont;
+            // 项目字体优先（内置LegacyRuntime无中文字形，中文说话人名会出豆腐块）
+            _safeFont = Resources.Load<Font>("VonwaonBitmap-16px");
+            if (_safeFont != null) return _safeFont;
+            try { _safeFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { }
+            if (_safeFont == null) { try { _safeFont = Resources.GetBuiltinResource<Font>("Arial.ttf"); } catch { } }
+            if (_safeFont == null)
+            {
+                // 最后手段：从已加载的Text组件偷字体
+                var existing = FindObjectOfType<Text>();
+                if (existing != null && existing.font != null) _safeFont = existing.font;
+            }
+            return _safeFont;
+        }
+
+        /// <summary>设置当前说话人的角标颜色和名字</summary>
+        private void SetSpeakerTag(int charIndex)
+        {
+            if (speakerTag == null || speakerTagBg == null) return;
+            string charName = charIndex < playerInfoCount() && charIndex >= 0
+                ? GetCharName(charIndex) : "?";
+            Color c = charIndex >= 0 && charIndex < CharColors.Length ? CharColors[charIndex] : Color.gray;
+
+            speakerTag.text = charName;
+            speakerTagBg.color = new Color(c.r, c.g, c.b, 0.95f);
+
+            // 彩色竖条同步变色
+            var bar = dialogBox?.transform.Find("SpeakerColorBar")?.GetComponent<Image>();
+            if (bar != null) bar.color = new Color(c.r, c.g, c.b, 0.9f);
+        }
+
+        private string GetCharName(int idx)
+        {
+            var names = new[] { BargainState.sellerName, "", "", "" };
+            // 简化：从 BargainState 获取
+            if (idx == BargainState.sellerIndex) return BargainState.sellerName;
+            if (idx == BargainState.buyerIndex) return BargainState.buyerName;
+            return idx == 0 ? "Lizzie" : idx == 1 ? "Rothwell" : idx == 2 ? "Ruth" : "Xu Feng";
+        }
+
+        private int playerInfoCount() => 4;
+
+        // ==================== 报价数字闪色 ====================
+
+        /// <summary>数字变化时闪色动画：涨价绿色闪、降价红色闪</summary>
+        private IEnumerator FlashOfferText(Text target, bool isIncrease)
+        {
+            if (target == null) yield break;
+            Color flashColor = isIncrease
+                ? new Color(0.4f, 1f, 0.4f)  // 涨=亮绿
+                : new Color(1f, 0.4f, 0.4f); // 跌=亮红
+            Color original = target.color;
+            float duration = 0.4f;
+            float elapsed = 0f;
+            target.color = flashColor;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                target.color = Color.Lerp(flashColor, original, elapsed / duration);
+                yield return null;
+            }
+            target.color = original;
+        }
+
+        // ==================== 主逻辑 ====================
 
         private void UpdateBargainDisplay()
         {
             if (roundText != null)
-                roundText.text = $"第{BargainState.currentRound}轮";
+                roundText.text = I18n.T("bargain_round_no", $"第{BargainState.currentRound}轮", ("n", BargainState.currentRound));
+
+            // 报价数字变化时闪色
+            bool sellerChanged = Mathf.Abs(BargainState.sellerOffer - lastSellerOffer) > 0.5f && lastSellerOffer >= 0;
+            bool buyerChanged = Mathf.Abs(BargainState.buyerOffer - lastBuyerOffer) > 0.5f && lastBuyerOffer >= 0;
+
             if (sellerOfferText != null)
-                sellerOfferText.text = $"卖方({BargainState.sellerName}): {Mathf.RoundToInt(BargainState.sellerOffer)}元";
+            {
+                sellerOfferText.text = $"{BargainState.sellerName}: {Mathf.RoundToInt(BargainState.sellerOffer)}";
+                if (sellerChanged)
+                {
+                    bool up = BargainState.sellerOffer > lastSellerOffer;
+                    StartCoroutine(FlashOfferText(sellerOfferText, up));
+                }
+            }
             if (buyerOfferText != null)
-                buyerOfferText.text = $"买方({BargainState.buyerName}): {Mathf.RoundToInt(BargainState.buyerOffer)}元";
+            {
+                buyerOfferText.text = $"{BargainState.buyerName}: {Mathf.RoundToInt(BargainState.buyerOffer)}";
+                if (buyerChanged)
+                {
+                    bool up = BargainState.buyerOffer > lastBuyerOffer;
+                    StartCoroutine(FlashOfferText(buyerOfferText, up));
+                }
+            }
+            lastSellerOffer = BargainState.sellerOffer;
+            lastBuyerOffer = BargainState.buyerOffer;
 
             if (BargainState.CheckOverlap())
             {
@@ -111,7 +327,7 @@ namespace SheNicest.UI
                     else
                         previewOffer = BargainState.sellerOffer + sellerDiff * (factor + playerRate);
 
-                    string role = BargainState.isPlayerBuyer ? "买" : "卖";
+                    string role = BargainState.isPlayerBuyer ? I18n.T("bargain_role_buy", "买") : I18n.T("bargain_role_sell", "卖");
                     offerButtonTexts[i].text = $"{role}{Mathf.RoundToInt(previewOffer)}元";
                 }
             }
@@ -119,7 +335,7 @@ namespace SheNicest.UI
 
         private void SelectOffer(int offerIndex)
         {
-            if (offerBusy || resultDecided) return;
+            if (offerBusy || resultDecided) return; // v4.2 防重入
             StartCoroutine(SelectOfferRoutine(offerIndex));
         }
 
@@ -128,74 +344,74 @@ namespace SheNicest.UI
             offerBusy = true;
             try
             {
-                float[] roundFactors = BargainState.currentRound == 1
-                    ? new float[] { 0.30f, 0.50f, 0.70f }
-                    : new float[] { 0.40f, 0.60f, 0.80f };
+            float[] roundFactors = BargainState.currentRound == 1
+                ? new float[] { 0.30f, 0.50f, 0.70f }
+                : new float[] { 0.40f, 0.60f, 0.80f };
 
-                float factor = roundFactors[offerIndex];
-                float buyerDiff = BargainState.sellerOffer - BargainState.buyerOffer;
-                float sellerDiff = BargainState.buyerOffer - BargainState.sellerOffer;
+            float factor = roundFactors[offerIndex];
+            float buyerDiff = BargainState.sellerOffer - BargainState.buyerOffer;
+            float sellerDiff = BargainState.buyerOffer - BargainState.sellerOffer;
 
-                float playerRate = BargainState.priceChangeRate[BargainState.selectedCardIndex];
-                float aiRate = BargainState.priceChangeRate[BargainState.aiCardIndex];
+            float playerRate = BargainState.priceChangeRate[BargainState.selectedCardIndex];
+            float aiRate = BargainState.priceChangeRate[BargainState.aiCardIndex];
 
-                if (BargainState.isPlayerBuyer)
-                {
-                    BargainState.buyerOffer += buyerDiff * (factor + playerRate);
-                    BargainState.sellerOffer += sellerDiff * (factor + aiRate);
-                }
-                else
-                {
-                    BargainState.sellerOffer += sellerDiff * (factor + playerRate);
-                    BargainState.buyerOffer += buyerDiff * (factor + aiRate);
-                }
+            if (BargainState.isPlayerBuyer)
+            {
+                BargainState.buyerOffer += buyerDiff * (factor + playerRate);
+                BargainState.sellerOffer += sellerDiff * (factor + aiRate);
+            }
+            else
+            {
+                BargainState.sellerOffer += sellerDiff * (factor + playerRate);
+                BargainState.buyerOffer += buyerDiff * (factor + aiRate);
+            }
 
-                Debug.Log($"[BargainOffer] Round {BargainState.currentRound + 1}: seller={BargainState.sellerOffer:F0}, buyer={BargainState.buyerOffer:F0}");
+            Debug.Log($"[BargainOffer] Round {BargainState.currentRound + 1}: seller={BargainState.sellerOffer:F0}, buyer={BargainState.buyerOffer:F0}");
 
-                int playerIdx = BargainState.isPlayerBuyer ? BargainState.buyerIndex : BargainState.sellerIndex;
-                int aiIdx = BargainState.isPlayerBuyer ? BargainState.sellerIndex : BargainState.buyerIndex;
-                int playerPrice = BargainState.isPlayerBuyer
-                    ? Mathf.RoundToInt(BargainState.buyerOffer)
-                    : Mathf.RoundToInt(BargainState.sellerOffer);
-                int aiPrice = BargainState.isPlayerBuyer
-                    ? Mathf.RoundToInt(BargainState.sellerOffer)
-                    : Mathf.RoundToInt(BargainState.buyerOffer);
-                int diff = Mathf.RoundToInt(Mathf.Abs(BargainState.sellerOffer - BargainState.buyerOffer));
-                string aiName = BargainState.isPlayerBuyer ? BargainState.sellerName : BargainState.buyerName;
+            int playerIdx = BargainState.isPlayerBuyer ? BargainState.buyerIndex : BargainState.sellerIndex;
+            int aiIdx = BargainState.isPlayerBuyer ? BargainState.sellerIndex : BargainState.buyerIndex;
+            int playerPrice = BargainState.isPlayerBuyer
+                ? Mathf.RoundToInt(BargainState.buyerOffer)
+                : Mathf.RoundToInt(BargainState.sellerOffer);
+            int aiPrice = BargainState.isPlayerBuyer
+                ? Mathf.RoundToInt(BargainState.sellerOffer)
+                : Mathf.RoundToInt(BargainState.buyerOffer);
+            int diff = Mathf.RoundToInt(Mathf.Abs(BargainState.sellerOffer - BargainState.buyerOffer));
+            string aiName = BargainState.isPlayerBuyer ? BargainState.sellerName : BargainState.buyerName;
 
-                // 玩家说出自己的让步姿态（选项1~3）
-                var playerLine = BargainState.GetLine(
-                    BargainState.selectedCardIndex, BargainState.isPlayerSeller,
-                    $"选项{offerIndex + 1}",
-                    opponentName: aiName, offer: playerPrice, diff: diff);
-                if (!string.IsNullOrEmpty(playerLine.text))
-                    yield return ShowDialogCoroutine(playerIdx, playerLine, 2.5f);
+            // 玩家说出自己的让步姿态（选项1~3）
+            var playerLine = BargainState.GetLine(
+                BargainState.selectedCardIndex, BargainState.isPlayerSeller,
+                I18n.T("bargain_option", $"选项{offerIndex + 1}", ("n", offerIndex + 1)),
+                opponentName: aiName, offer: playerPrice, diff: diff);
+            if (!string.IsNullOrEmpty(playerLine.text))
+                yield return ShowDialogCoroutine(playerIdx, playerLine, 2.5f);
 
-                // AI根据玩家的让步幅度做出反应
-                float movePct = Mathf.Clamp01(factor + playerRate);
-                var aiLine = BargainState.GetLine(
-                    BargainState.aiCardIndex, !BargainState.isPlayerSeller,
-                    BargainState.ReactionStage(movePct),
-                    opponentName: BargainState.isPlayerBuyer ? BargainState.buyerName : BargainState.sellerName,
-                    myPrice: aiPrice, diff: diff);
-                if (!string.IsNullOrEmpty(aiLine.text))
-                    yield return ShowDialogCoroutine(aiIdx, aiLine, 2.5f);
+            // AI根据玩家的让步幅度做出反应
+            float movePct = Mathf.Clamp01(factor + playerRate);
+            var aiLine = BargainState.GetLine(
+                BargainState.aiCardIndex, !BargainState.isPlayerSeller,
+                BargainState.ReactionStage(movePct),
+                opponentName: BargainState.isPlayerBuyer ? BargainState.buyerName : BargainState.sellerName,
+                myPrice: aiPrice, diff: diff);
+            if (!string.IsNullOrEmpty(aiLine.text))
+                yield return ShowDialogCoroutine(aiIdx, aiLine, 2.5f);
 
-                if (BargainState.CheckOverlap())
-                {
-                    int finalPrice = Mathf.RoundToInt((BargainState.sellerOffer + BargainState.buyerOffer) / 2f);
-                    GotoResult(true, finalPrice);
-                    yield break;
-                }
+            if (BargainState.CheckOverlap())
+            {
+                int finalPrice = Mathf.RoundToInt((BargainState.sellerOffer + BargainState.buyerOffer) / 2f);
+                GotoResult(true, finalPrice);
+                yield break;
+            }
 
-                BargainState.currentRound++;
-                if (BargainState.currentRound > 3)
-                {
-                    GotoResult(false, 0);
-                    yield break;
-                }
+            BargainState.currentRound++;
+            if (BargainState.currentRound > 3)
+            {
+                GotoResult(false, 0);
+                yield break;
+            }
 
-                UpdateBargainDisplay();
+            UpdateBargainDisplay();
             }
             finally
             {
@@ -205,7 +421,6 @@ namespace SheNicest.UI
 
         private IEnumerator ShowFirstRoundDialog()
         {
-            // 卖方开场白
             int sellerCard = BargainState.isPlayerSeller ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
             var sellerLine = BargainState.GetLine(sellerCard, true, "开场",
                 opponentName: BargainState.buyerName,
@@ -213,7 +428,6 @@ namespace SheNicest.UI
             if (!string.IsNullOrEmpty(sellerLine.text) && BargainState.sellerIndex < characterPortraits.Count)
                 yield return ShowDialogCoroutine(BargainState.sellerIndex, sellerLine, 2.5f);
 
-            // 买方开场白
             int buyerCard = BargainState.isPlayerBuyer ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
             var buyerLine = BargainState.GetLine(buyerCard, false, "开场",
                 opponentName: BargainState.sellerName,
@@ -224,18 +438,18 @@ namespace SheNicest.UI
 
         private void GotoResult(bool success, int finalPrice)
         {
-            if (resultDecided) return; // 幂等：结果只判定一次，后续重入不得改写
+            if (resultDecided) return; // v4.2 幂等：结果只判定一次，后续重入不得改写
             resultDecided = true;
 
-            // 立即禁用报价按钮，防止场景切换窗口内的点击重入
+            // v4.2 立即禁用报价按钮，防止场景切换窗口内的点击重入
             foreach (var btn in offerButtons)
                 if (btn != null) btn.interactable = false;
 
             BargainState.resultSuccess = success;
             BargainState.resultFinalPrice = finalPrice;
 
-            // 生成收尾台词（以玩家的人格卡与立场为准）
-            int speakerCard = BargainState.isPlayerBuyer || BargainState.isPlayerSeller ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
+            int speakerCard = BargainState.isPlayerBuyer || BargainState.isPlayerSeller
+                ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
             bool speakerIsSeller = BargainState.isPlayerSeller;
             if (speakerCard >= 0)
             {
@@ -248,7 +462,7 @@ namespace SheNicest.UI
             SceneManager.LoadScene("讨价还价_结果");
         }
 
-        // ==================== 对话系统 ====================
+        // ==================== P5 对话演出 ====================
 
         private IEnumerator ShowDialogCoroutine(int speakerIndex, BargainState.DialogLine line, float duration = 2.5f)
         {
@@ -259,14 +473,24 @@ namespace SheNicest.UI
                 if (btn != null) btn.interactable = false;
             }
 
+            // 切换表情 + 弹跳
             SetPortraitExpression(speakerIndex, line.emotion);
             StartCoroutine(PortraitPunch(speakerIndex));
 
-            dialogText.text = line.text;
+            // 设置说话人角标
+            SetSpeakerTag(speakerIndex);
+
+            // 打字机逐字显示
             dialogBox.SetActive(true);
             PositionDialog(speakerIndex);
 
-            yield return new WaitForSeconds(duration);
+            if (typewriterCoroutine != null) StopCoroutine(typewriterCoroutine);
+            typewriterCoroutine = StartCoroutine(TypewriterEffect(line.text, dialogText, 0.03f));
+
+            // 打字完成后等剩余时间
+            float typeTime = line.text.Length * 0.03f;
+            float remaining = Mathf.Max(0, duration - typeTime);
+            yield return new WaitForSeconds(remaining + 0.3f);
 
             dialogBox.SetActive(false);
 
@@ -274,6 +498,20 @@ namespace SheNicest.UI
             {
                 if (btn != null) btn.interactable = true;
             }
+        }
+
+        /// <summary>打字机逐字显示效果</summary>
+        private IEnumerator TypewriterEffect(string text, Text target, float charDelay)
+        {
+            target.text = "";
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in text)
+            {
+                sb.Append(c);
+                target.text = sb.ToString();
+                yield return new WaitForSeconds(charDelay);
+            }
+            target.text = text; // 确保完整显示
         }
 
         /// <summary>切换说话人的立绘表情（0=原始立绘，1怒/2惊/3得意从Resources/BargainExpressions加载）</summary>
@@ -293,16 +531,13 @@ namespace SheNicest.UI
 
             var tex = Resources.Load<Texture2D>($"BargainExpressions/expr_{charIndex}_{emotion}");
             if (tex == null)
-            {
-                // 没有差分图时退回原始立绘，保证不缺图
                 return baseSprites.TryGetValue(charIndex, out var fallback) ? fallback : null;
-            }
             var sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
             expressionSprites[key] = sprite;
             return sprite;
         }
 
-        /// <summary>说话时立绘轻微放大回弹，强调"谁在说话"</summary>
+        /// <summary>说话时立绘轻微放大回弹</summary>
         private IEnumerator PortraitPunch(int speakerIndex)
         {
             if (speakerIndex < 0 || speakerIndex >= characterPortraits.Count || characterPortraits[speakerIndex] == null) yield break;
@@ -314,7 +549,7 @@ namespace SheNicest.UI
             {
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
-                float scale = Mathf.LerpUnclamped(punch, 1f, t * t); // ease-out回落
+                float scale = Mathf.LerpUnclamped(punch, 1f, t * t);
                 rt.localScale = baseScale * scale;
                 yield return null;
             }
@@ -328,12 +563,11 @@ namespace SheNicest.UI
             var portraitRt = characterPortraits[speakerIndex].rectTransform;
             var dialogRt = dialogBox.GetComponent<RectTransform>();
 
-            // 台词框靠近说话人头像：玩家(0)在左下，AI(1-3)在右上。
-            // （此前两组偏移写反，说话人的台词框会弹到对方头像旁，台词归属视觉错位）
-            if (speakerIndex == 0)
-                dialogRt.anchoredPosition = new Vector2(portraitRt.anchoredPosition.x - 420, portraitRt.anchoredPosition.y - 150);
+            bool isBottom = portraitRt.anchoredPosition.y < 0;
+            if (isBottom)
+                dialogRt.anchoredPosition = new Vector2(portraitRt.anchoredPosition.x, portraitRt.anchoredPosition.y + 600f);
             else
-                dialogRt.anchoredPosition = new Vector2(portraitRt.anchoredPosition.x + 250, portraitRt.anchoredPosition.y + 200);
+                dialogRt.anchoredPosition = new Vector2(portraitRt.anchoredPosition.x, portraitRt.anchoredPosition.y - 600f);
         }
     }
 }

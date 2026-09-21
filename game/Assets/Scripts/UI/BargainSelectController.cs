@@ -40,11 +40,11 @@ namespace SheNicest.UI
             if (titleText != null)
             {
                 if (BargainState.isAIVsAI)
-                    titleText.text = "AI 之间的讨价还价";
+                    titleText.text = I18n.T("bargain_title_aivai", "AI 之间的讨价还价");
                 else if (BargainState.isPlayerSeller)
-                    titleText.text = "你是卖方——选择你的谈判策略";
+                    titleText.text = I18n.T("bargain_title_seller", "你是卖方——选择你的谈判策略");
                 else if (BargainState.isPlayerBuyer)
-                    titleText.text = "你是买方——选择你的谈判策略";
+                    titleText.text = I18n.T("bargain_title_buyer", "你是买方——选择你的谈判策略");
                 else
                     titleText.text = "选择你的人格卡";
             }
@@ -133,7 +133,10 @@ namespace SheNicest.UI
                 string adv = BargainState.FormatPercent(BargainState.firstRoundAdvantage[i]);
                 string rate = BargainState.FormatPercent(BargainState.priceChangeRate[i]);
                 string rep = BargainState.reputationChange[i] >= 0 ? $"+{BargainState.reputationChange[i]}" : $"{BargainState.reputationChange[i]}";
-                text.text = $"{BargainState.cardNames[i]}\n首轮优势: {adv}\n改价幅度: {rate}\n声望: {rep}";
+                text.text = $"{I18n.T("card_" + i, BargainState.cardNames[i])}\n" +
+                            $"{I18n.T("card_adv", $"首轮优势: {adv}", ("adv", adv))}\n" +
+                            $"{I18n.T("card_rate", $"改价幅度: {rate}", ("rate", rate))}\n" +
+                            $"{I18n.T("card_rep", $"声望: {rep}", ("rep", rep))}";
 
                 textObj.SetActive(false);
                 cardInfoTexts.Add(textObj);

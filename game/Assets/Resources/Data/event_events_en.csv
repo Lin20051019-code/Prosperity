@@ -1,0 +1,15 @@
+﻿eventName,description,effectType,cashChange,reputationChange,skipNextTurn,effectDescription,flavorText,eventKey
+Earthquake,3 random properties downgrade,DowngradeProperty,0,0,false,3 random properties lose one level,"A sudden earthquake rocked the city. Three properties took the hit.",地震
+Gang Turf War,All players lose 250 cash,CashLoss,-250,0,false,All players -250 cash,"Gunfire shattered the city's quiet evening. Chaos took its toll on everyone.",黑帮火拼
+Typhoon,All players teleported to random positions,Custom,0,0,false,All players teleported randomly,"The typhoon swept through, scattering everyone to new positions across the city.",台风
+Border Shutdown,Everyone rolls a single die for 4 rounds,Custom,0,0,false,Single die for 4 rounds,"The neighboring country closed its borders. Goods and travelers slowed to a crawl — so does the city.",边境封锁
+Scandal,Richest player reputation -10 and cash -300,ReputationLoss,0,-10,false,Richest player reputation -10 cash -300,"A scandal hit the headlines. The higher you climb, the easier you fall.",丑闻
+Charity Gala,All players reputation +5,ReputationGain,0,5,false,All players +5 reputation,"Tonight's spotlight belongs to those who give back. Kindness, it turns out, is also an investment.",公益晚会
+Traffic Accident,Random player skips next turn,SkipTurn,0,0,true,Random player skips next turn,"An accident brought traffic to a standstill. Someone has to sit this one out.",交通事故
+Gold Rush,All players gain 200 cash,CashGain,200,0,false,All players +200 cash,"A fortune appeared from nowhere. Nobody asked where it came from, but everyone's pockets got heavier.",发现金矿
+Neighboring Bank Collapse,All players lose 200 cash,CashLoss,-200,0,false,All players -200 cash,"The biggest bank in the neighboring city just went under. The panic spread along the trade routes.",邻城暴雷
+Lending a Hand,Richest -500 Poorest +600 (Crisis +700),Custom,0,0,false,Richest -500 Poorest +600 Crisis +700,"The wealthy need to lift up those still climbing. Tonight, they finally do.",伸出援手
+Lending a Hand,Richest -500 Poorest +600 (Crisis +700),Custom,0,0,false,Richest -500 Poorest +600 Crisis +700,"The wealthy need to lift up those still climbing. Tonight, they finally do.",伸出援手
+Lending a Hand,Richest -500 Poorest +600 (Crisis +700),Custom,0,0,false,Richest -500 Poorest +600 Crisis +700,"The wealthy need to lift up those still climbing. Tonight, they finally do.",伸出援手
+Robin Hood Strikes,Richest player -500,Custom,0,0,false,Richest player -500,"A masked figure visited the city's wealthiest resident last night. By morning, the safe was 500 yuan lighter.",罗宾汉出没
+Robin Hood Strikes,Richest player -500,Custom,0,0,false,Richest player -500,"A masked figure visited the city's wealthiest resident last night. By morning, the safe was 500 yuan lighter.",罗宾汉出没

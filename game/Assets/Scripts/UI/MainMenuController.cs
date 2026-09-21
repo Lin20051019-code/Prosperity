@@ -42,14 +42,53 @@ namespace SheNicest.UI
 
         private void Start()
         {
+            // v4.2 i18n：首启按系统语言自动检测（主菜单有手动切换按钮）
+            if (Application.systemLanguage == SystemLanguage.English)
+                BargainState.language = "en";
+
             AudioManager.Instance?.PlayMainMenuBGM();
             BindButtons();
             CloseAllPanels();
             InitSettings();
+            CreateLanguageToggle();
 
             // 继续游戏：无任何存档时置灰不可点
             if (continueGameButton != null)
                 continueGameButton.interactable = SaveLoadManager.HasAnySave();
+        }
+
+        /// <summary>v4.2 i18n：右上角语言切换按钮（EN/中文）</summary>
+        private void CreateLanguageToggle()
+        {
+            var canvas = FindObjectOfType<Canvas>();
+            if (canvas == null) return;
+            var btnObj = new GameObject("LanguageToggle", typeof(Image), typeof(Button));
+            btnObj.transform.SetParent(canvas.transform, false);
+            var img = btnObj.GetComponent<Image>();
+            img.color = new Color(0.08f, 0.08f, 0.1f, 0.85f);
+            var rt = btnObj.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(1, 1);
+            rt.anchorMax = new Vector2(1, 1);
+            rt.pivot = new Vector2(1, 1);
+            rt.anchoredPosition = new Vector2(-24, -24);
+            rt.sizeDelta = new Vector2(150, 44);
+
+            var txtObj = new GameObject("LangText", typeof(Text));
+            txtObj.transform.SetParent(btnObj.transform, false);
+            var txt = txtObj.AddComponent<Text>();
+            txt.font = BargainState.GetSafeFont();
+            txt.fontSize = 22;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.color = Color.white;
+            txt.rectTransform.sizeDelta = new Vector2(150, 44);
+            txt.text = BargainState.language == "en" ? "中文" : "EN";
+
+            btnObj.GetComponent<Button>().onClick.AddListener(() =>
+            {
+                BargainState.language = BargainState.language == "en" ? "zh" : "en";
+                I18n.Reset();
+                txt.text = BargainState.language == "en" ? "中文" : "EN";
+            });
         }
 
         private void BindButtons()

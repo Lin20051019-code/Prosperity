@@ -80,25 +80,25 @@ namespace SheNicest.UI
                         if (bd != null)
                         {
                             int marketPrice = bd.GetMarketPrice(prosperity);
-                            string owner = bd.IsGovernmentOwned ? "政府所有" :
-                                bd.HasOwner ? $"玩家{bd.ownerIndex}" : "无主";
-                            return $"建筑格 (Lv.{bd.level})\n所有者: {owner}\n市场价格: {marketPrice}元";
+                            string owner = bd.IsGovernmentOwned ? I18n.T("tile_gov_owned", "政府所有") :
+                                bd.HasOwner ? I18n.T("tile_owner_player", $"玩家{bd.ownerIndex}", ("n", bd.ownerIndex)) : I18n.T("tile_unowned", "无主");
+                            return I18n.T("tile_building_info", $"建筑格 (Lv.{bd.level})\n所有者: {owner}\n市场价格: {marketPrice}元", ("level", bd.level), ("owner", owner), ("market", marketPrice));
                         }
                     }
-                    return "建筑格";
+                    return I18n.T("tile_building", "建筑格");
                 
                 case "惩罚块":
-                    return "惩罚格\n触发惩罚事件";
+                    return I18n.T("tile_penalty", "惩罚格\n触发惩罚事件");
                 case "奖励块":
-                    return "奖励格\n获得随机奖励";
+                    return I18n.T("tile_reward", "奖励格\n获得随机奖励");
                 case "事件块":
-                    return "事件格\n触发全局事件";
+                    return I18n.T("tile_event", "事件格\n触发全局事件");
                 case "基金会":
-                    return "公益中心\n可花费400获得12声誉";
+                    return I18n.T("tile_foundation", "公益中心\n可花费400获得12声誉");
                 case "火车块(1)":
-                    return "火车站\n花费50元传送到另一火车站";
+                    return I18n.T("tile_train", "火车站\n花费50元传送到另一火车站");
                 case "起点":
-                    return "起点\n经过获得200元工资";
+                    return I18n.T("tile_start", "起点\n经过获得200元工资");
                 default:
                     return null;
             }
