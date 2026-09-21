@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using UnityEngine;
 
 namespace SheNicest.UI
@@ -38,6 +36,7 @@ namespace SheNicest.UI
         public static bool resultCompleted;
         public static bool resultSuccess;
         public static int resultFinalPrice;
+        public static string resultLine; // 成交/失败的收尾台词，由报价场景生成，结果场景展示
 
         // ===== 常量 =====
         public static readonly float[] firstRoundAdvantage = { -0.10f, -0.10f, 0.30f, 0.30f };
@@ -45,8 +44,24 @@ namespace SheNicest.UI
         public static readonly int[] reputationChange = { 5, 3, -2, -3 };
         public static readonly string[] cardNames = { "交个朋友", "实价交易", "看人下菜", "极限压价" };
 
-        // ===== 对话文案 =====
-        private static readonly Dictionary<(int card, bool seller, int round), string> dialogDict = new Dictionary<(int, bool, int), string>();
+        /// <summary>安全字体获取（Vonwaon像素字体优先，回退内置字体）——供动态创建的UI文本使用（v4移植）</summary>
+        public static Font GetSafeFont()
+        {
+            var f = Resources.Load<Font>("VonwaonBitmap-16px");
+            if (f != null) return f;
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        // ===== 对话系统（台词池 + 情绪标签 + 动态变量，v3移植） =====
+        /// <summary>台词：text为文案（支持{opponent}{price}{diff}{offer}{final}占位符），emotion为表情索引 0平1怒2惊3得意</summary>
+        public struct DialogLine
+        {
+            public string text;
+            public int emotion;
+        }
+
+        private static readonly Dictionary<string, List<DialogLine>> dialogPools = new Dictionary<string, List<DialogLine>>();
+        private static readonly Dictionary<string, int> lastPick = new Dictionary<string, int>();
         private static bool dialogsLoaded = false;
 
         /// <summary>从DiceRollController.BargainData初始化共享状态</summary>
@@ -73,6 +88,7 @@ namespace SheNicest.UI
             sellerOffer = 0;
             buyerOffer = 0;
             resultCompleted = false;
+            resultLine = null;
         }
 
         /// <summary>AI选择人格卡</summary>
@@ -99,50 +115,107 @@ namespace SheNicest.UI
 
         // ===== 对话系统 =====
 
+        /// <summary>从Resources/BargainDialogs.csv加载台词池（列：卡牌,角色,阶段,情绪,台词；v3台词池系统）</summary>
         public static void LoadDialogs()
         {
             if (dialogsLoaded) return;
             dialogsLoaded = true;
 
-            string path = "Assets/Bargain文案 - Sheet1.csv";
-            if (!File.Exists(path)) { Debug.LogError($"[Bargain] Dialog CSV not found: {path}"); return; }
+            var asset = Resources.Load<TextAsset>("BargainDialogs");
+            if (asset == null) { Debug.LogError("[Bargain] Resources/BargainDialogs.csv not found"); return; }
 
-            var lines = new List<string>();
-            using (var reader = new StreamReader(path, new UTF8Encoding(false)))
+            dialogPools.Clear();
+            // 按CSV引号规则切逻辑行（沿用SplitLogicalLines，防引号内换行破坏行结构）
+            var rows = SplitLogicalLines(asset.text);
+            int count = 0;
+            for (int i = 1; i < rows.Count; i++)
             {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                    lines.Add(line);
+                string row = rows[i].Trim();
+                if (string.IsNullOrEmpty(row)) continue;
+
+                string[] fields = ParseCSVLine(row);
+                if (fields.Length < 5) continue;
+
+                string key = $"{fields[0].Trim()}|{fields[1].Trim()}|{fields[2].Trim()}";
+                var line = new DialogLine { text = fields[4].Trim(), emotion = EmotionIndex(fields[3].Trim()) };
+                if (!dialogPools.TryGetValue(key, out var pool))
+                    dialogPools[key] = pool = new List<DialogLine>();
+                pool.Add(line);
+                count++;
             }
-            if (lines.Count < 2) return;
-
-            int[] cardForCol = { 3, 2, 1, 0, 3, 2, 1, 0 };
-            bool[] sellerForCol = { true, true, true, true, false, false, false, false };
-            int[] roundForRow = { 0, 1, 2, 3, 4, 5, 6 };
-
-            for (int rowIdx = 1; rowIdx <= 7 && rowIdx < lines.Count; rowIdx++)
-            {
-                string line = lines[rowIdx].Trim();
-                if (string.IsNullOrEmpty(line)) continue;
-
-                string[] fields = ParseCSVLine(line);
-                int roundType = roundForRow[rowIdx - 1];
-
-                for (int col = 0; col < 8 && col + 1 < fields.Length; col++)
-                {
-                    string text = fields[col + 1].Trim();
-                    if (string.IsNullOrEmpty(text)) continue;
-                    dialogDict[(cardForCol[col], sellerForCol[col], roundType)] = text;
-                }
-            }
-            Debug.Log($"[Bargain] Loaded {dialogDict.Count} dialog entries");
+            Debug.Log($"[Bargain] Loaded {count} dialog lines into {dialogPools.Count} pools");
         }
 
-        public static string GetDialog(int cardIndex, bool isSeller, int roundType)
+        /// <summary>把整段CSV文本切成逻辑行：引号内的换行不切行（属于单元格内容）</summary>
+        private static List<string> SplitLogicalLines(string text)
         {
-            if (dialogDict.TryGetValue((cardIndex, isSeller, roundType), out string text))
-                return text;
-            return null;
+            var lines = new List<string>();
+            var sb = new System.Text.StringBuilder();
+            bool inQuotes = false;
+            foreach (char c in text)
+            {
+                if (c == '"') inQuotes = !inQuotes;
+
+                if (c == '\n' && !inQuotes)
+                {
+                    lines.Add(sb.ToString());
+                    sb.Clear();
+                }
+                else if (c != '\r')
+                {
+                    sb.Append(c);
+                }
+            }
+            if (sb.Length > 0) lines.Add(sb.ToString());
+            return lines;
+        }
+
+        private static int EmotionIndex(string tag)
+        {
+            switch (tag)
+            {
+                case "怒": return 1;
+                case "惊": return 2;
+                case "意": return 3;
+                default: return 0;
+            }
+        }
+
+        /// <summary>
+        /// 从台词池随机取一条（不与上次重复）并替换变量。
+        /// 阶段取值：开场 / 选项1~3（说话方的让步姿态）/ 让步低~高（对对方让步幅度的反应）/ 成交 / 失败
+        /// </summary>
+        public static DialogLine GetLine(int cardIndex, bool isSeller, string stage,
+            string opponentName = null, int? myPrice = null, int? diff = null, int? offer = null, int? final = null)
+        {
+            var key = $"{cardIndex}|{(isSeller ? "卖" : "买")}|{stage}";
+            if (!dialogPools.TryGetValue(key, out var pool) || pool.Count == 0)
+                return new DialogLine { text = null, emotion = 0 };
+
+            int pick = 0;
+            if (pool.Count > 1)
+            {
+                lastPick.TryGetValue(key, out int last);
+                do { pick = Random.Range(0, pool.Count); } while (pick == last);
+            }
+            lastPick[key] = pick;
+
+            var chosen = pool[pick];
+            string text = chosen.text
+                .Replace("{opponent}", opponentName ?? "")
+                .Replace("{price}", myPrice?.ToString() ?? "")
+                .Replace("{diff}", diff?.ToString() ?? "")
+                .Replace("{offer}", offer?.ToString() ?? "")
+                .Replace("{final}", final?.ToString() ?? "");
+            return new DialogLine { text = text, emotion = chosen.emotion };
+        }
+
+        /// <summary>按对方让步幅度（价差收敛比例）选择反应阶段</summary>
+        public static string ReactionStage(float movePct)
+        {
+            if (movePct < 0.35f) return "让步低";
+            if (movePct < 0.65f) return "让步中";
+            return "让步高";
         }
 
         private static string[] ParseCSVLine(string line)

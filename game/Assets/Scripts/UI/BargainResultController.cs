@@ -23,15 +23,31 @@ namespace SheNicest.UI
 
             if (resultText != null)
             {
+                string tileName = DiceRollController.BargainData.tileName;
+                if (string.IsNullOrEmpty(tileName)) tileName = "房产";
+
+                string role = BargainState.isAIVsAI
+                    ? ""
+                    : (BargainState.isPlayerBuyer ? "（你是买方）" : "（你是卖方）");
+
+                // v3移植：收尾台词（成交/失败的现场感），无台词时退回纯结果文案
+                string quote = string.IsNullOrEmpty(BargainState.resultLine) ? "" : $"「{BargainState.resultLine}」\n";
+
                 if (BargainState.resultSuccess)
-                    resultText.text = $"交易成功！\n成交价: {BargainState.resultFinalPrice}元";
+                    resultText.text = $"{quote}交易成功！\n{BargainState.buyerName} 以 {BargainState.resultFinalPrice} 元\n购得 {tileName}（原属 {BargainState.sellerName}）{role}";
                 else
-                    resultText.text = "交易失败\n将支付租金";
+                    resultText.text = $"{quote}交易失败\n{BargainState.buyerName} 需向 {BargainState.sellerName}\n支付 {tileName} 的租金{role}";
             }
         }
 
+        private bool confirmed; // 防连点：防止重复设置结果/重复加载GameScene
+
         private void ConfirmResult()
         {
+            if (confirmed) return;
+            confirmed = true;
+            if (confirmResultButton != null) confirmResultButton.interactable = false;
+
             // 设置BargainResult供DiceRollController读取
             BargainController.BargainResult.isSuccess = BargainState.resultSuccess;
             BargainController.BargainResult.finalPrice = BargainState.resultFinalPrice;

@@ -49,7 +49,8 @@ namespace SheNicest.UI
             if (reputationText != null)
             {
                 reputationText.text = $"声望 {data.reputation}";
-                reputationText.color = reputationColor;
+                // v2.2：声望<45 恶名预警红字（危机维持费翻倍/通胀起征点更低的提前预告）
+                reputationText.color = data.reputation < 45 ? new Color(0.65f, 0.12f, 0.1f) : reputationColor;
                 reputationText.fontStyle = FontStyle.Bold;
             }
         }

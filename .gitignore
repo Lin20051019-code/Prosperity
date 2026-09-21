@@ -97,3 +97,41 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# ============================================================
+# 以下是本项目补充的忽略规则（协作必需，勿删）
+# 说明：以上规则对 game/ 子目录同样生效，此处只补充额外项
+# ============================================================
+
+# --- 代码编辑器 / 智能体工作台本地文件 ---
+.workbuddy/
+
+# --- 游戏构建产物（体积大且可重新生成）---
+[Gg]ame/[Bb]uild/
+[Gg]ame/[Bb]uilds/
+[Gg]ame/[Ll]ibrary/
+[Gg]ame/[Tt]emp/
+[Gg]ame/[Oo]bj/
+[Gg]ame/[Ll]ogs/
+[Gg]ame/[Uu]ser[Ss]ettings/
+[Gg]ame/.vs/
+[Gg]ame/.codely.packages/
+
+# --- Codely 工具的本地缓存 / 剪贴板 ---
+# .codely-cli 是 AI 工具自身安装的插件与缓存（曾误提交 1463 个文件 / 670MB），
+# 它不是游戏源码，队友的编辑器会自己重新安装，因此整体忽略。
+[Gg]ame/.codely-cli/
+[Gg]ame/.codely/clipboard/
+[Gg]ame/.codely/clipboard-*
+
+# --- 本地验证截图与录屏（非游戏资源，代码中无引用）---
+[Gg]ame/screenshots/
+
+# --- 本地备份副本（历史版本已在 git 中）---
+[Gg]ame/备份/
+
+# --- macOS / 系统垃圾文件 ---
+.DS_Store
+Thumbs.db
+desktop.ini
+._*

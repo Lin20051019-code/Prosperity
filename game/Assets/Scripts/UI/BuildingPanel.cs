@@ -21,6 +21,7 @@ namespace SheNicest.UI
         private System.Action onClosed;
         private System.Action _onAction;
         private System.Action _onBargain;
+        private bool _closed; // 防连点：面板关闭后忽略后续点击
 
         private void Start()
         {
@@ -36,13 +37,14 @@ namespace SheNicest.UI
         public void ShowGovernmentOwned(BuildingData data, int marketPrice, System.Action onBuy, System.Action onClose)
         {
             onClosed = onClose;
+            _closed = false;
             if (panel != null) panel.SetActive(true);
 
             if (infoText != null)
-                infoText.text = $"空地（0级）\n市场价格: {marketPrice}元\n购买费用: {data.UpgradeCost}元";
+                infoText.text = $"空地（0级）\n市场价格: {marketPrice}元\n购买费用: {BuildingData.BuyCost}元（政府补贴价）";
 
             if (actionButtonText != null)
-                actionButtonText.text = $"购买 ({data.UpgradeCost}元)";
+                actionButtonText.text = $"购买 ({BuildingData.BuyCost}元)";
             if (actionButton != null) actionButton.gameObject.SetActive(true);
             if (bargainButton != null) bargainButton.gameObject.SetActive(false);
             if (skipButton != null) skipButton.gameObject.SetActive(true);
@@ -50,10 +52,30 @@ namespace SheNicest.UI
             _onAction = onBuy;
         }
 
+        /// <summary>公益中心（捐款换声望）</summary>
+        public void ShowCharity(int cost, int repGain, System.Action onDonate, System.Action onClose)
+        {
+            onClosed = onClose;
+            _closed = false;
+            if (panel != null) panel.SetActive(true);
+
+            if (infoText != null)
+                infoText.text = $"公益中心\n捐款 {cost} 元\n可获得 {repGain} 点声望";
+
+            if (actionButtonText != null)
+                actionButtonText.text = $"捐款 ({cost}元)";
+            if (actionButton != null) actionButton.gameObject.SetActive(true);
+            if (bargainButton != null) bargainButton.gameObject.SetActive(false);
+            if (skipButton != null) skipButton.gameObject.SetActive(true);
+
+            _onAction = onDonate;
+        }
+
         /// <summary>火车站（乘坐火车）</summary>
         public void ShowTrainStation(int cost, System.Action onRide, System.Action onClose)
         {
             onClosed = onClose;
+            _closed = false;
             if (panel != null) panel.SetActive(true);
 
             if (infoText != null)
@@ -72,17 +94,18 @@ namespace SheNicest.UI
         public void ShowOwned(BuildingData data, int marketPrice, string ownerName, System.Action onUpgrade, System.Action onClose)
         {
             onClosed = onClose;
+            _closed = false;
             if (panel != null) panel.SetActive(true);
 
             string nextInfo = data.CanUpgrade
-                ? $"\n升级费用: {data.UpgradeCost}元 → {data.level + 1}级"
+                ? $"\n升级费用: {BuildingData.UpgradeCost}元 → {data.level + 1}级"
                 : "\n已达最高等级（3级）";
 
             if (infoText != null)
                 infoText.text = $"{data.level}级建筑（{ownerName}）\n市场价格: {marketPrice}元{nextInfo}";
 
             if (actionButtonText != null)
-                actionButtonText.text = data.CanUpgrade ? $"升级 ({data.UpgradeCost}元)" : "已满级";
+                actionButtonText.text = data.CanUpgrade ? $"升级 ({BuildingData.UpgradeCost}元)" : "已满级";
             if (actionButton != null) actionButton.gameObject.SetActive(data.CanUpgrade);
             if (bargainButton != null) bargainButton.gameObject.SetActive(false);
             if (skipButton != null) skipButton.gameObject.SetActive(true);
@@ -94,13 +117,17 @@ namespace SheNicest.UI
         public void ShowRented(BuildingData data, int marketPrice, string ownerName, System.Action onPayRent, System.Action onBargain, System.Action onClose)
         {
             onClosed = onClose;
+            _closed = false;
             if (panel != null) panel.SetActive(true);
 
             if (infoText != null)
-                infoText.text = $"{data.level}级建筑（{ownerName}）\n市场价格: {marketPrice}元\n租金: {marketPrice / 10}元";
+            {
+                int rent = data.GetRent();
+                infoText.text = $"{data.level}级建筑（{ownerName}）\n市场价格: {marketPrice}元\n租金: {rent}元{(data.level >= 3 ? "（3级翻倍）" : "")}";
+            }
 
             if (actionButtonText != null)
-                actionButtonText.text = $"支付租金 ({marketPrice / 10}元)";
+                actionButtonText.text = $"支付租金 ({data.GetRent()}元)";
             if (actionButton != null) actionButton.gameObject.SetActive(true);
             if (bargainButtonText != null)
                 bargainButtonText.text = "Bargain";
@@ -113,24 +140,30 @@ namespace SheNicest.UI
 
         private void OnAction()
         {
+            if (_closed) return;
+            _closed = true;
             _onAction?.Invoke();
             Close();
         }
 
         private void OnBargain()
         {
+            if (_closed) return;
+            _closed = true;
             _onBargain?.Invoke();
             Close();
         }
 
         private void OnSkip()
         {
+            if (_closed) return;
             Close();
         }
 
         private void Close()
         {
             if (panel != null) panel.SetActive(false);
+            _closed = true;
             onClosed?.Invoke();
         }
     }

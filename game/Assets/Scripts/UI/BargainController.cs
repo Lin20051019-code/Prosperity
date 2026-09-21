@@ -1,7 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
@@ -798,16 +796,11 @@ namespace SheNicest.UI
             if (dialogsLoaded) return;
             dialogsLoaded = true;
 
-            string path = "Assets/Bargain文案 - Sheet1.csv";
-            if (!File.Exists(path)) { Debug.LogError($"[Bargain] Dialog CSV not found: {path}"); return; }
+            string resourcePath = "Data/bargain_dialogs";
+            var csv = Resources.Load<TextAsset>(resourcePath);
+            if (csv == null) { Debug.LogError($"[Bargain] Dialog CSV not found in Resources: {resourcePath}"); return; }
 
-            var lines = new List<string>();
-            using (var reader = new StreamReader(path, new UTF8Encoding(false)))
-            {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                    lines.Add(line);
-            }
+            var lines = new List<string>(csv.text.Split('\n'));
             if (lines.Count < 2) return;
 
             // 解析表头获取列映射

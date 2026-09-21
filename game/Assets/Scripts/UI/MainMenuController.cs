@@ -20,6 +20,18 @@ namespace SheNicest.UI
         [SerializeField] private GameObject creditsPanel;
         [SerializeField] private Button panelClickCatcher;
 
+        [Header("Start Sub Panel")]
+        [SerializeField] private GameObject startPanel;      // 「开始游戏」子面板（新游戏/继续游戏）
+        [SerializeField] private Button newGameButton;
+        [SerializeField] private Button continueGameButton;  // 无任何存档时置灰
+        [SerializeField] private Button startPanelCloseButton;
+
+        [Header("Load Save Panel")]
+        [SerializeField] private GameObject loadSavePanel;   // 「继续游戏」存档选择框
+        [SerializeField] private Button loadSaveCloseButton;
+        [SerializeField] private Button[] loadSlotButtons = new Button[SaveLoadManager.SlotCount];
+        [SerializeField] private Text[] loadSlotTexts = new Text[SaveLoadManager.SlotCount];
+
         [Header("Scene Names")]
         [SerializeField] private string gameSceneName = "CharacterSelectScene";
 
@@ -34,6 +46,10 @@ namespace SheNicest.UI
             BindButtons();
             CloseAllPanels();
             InitSettings();
+
+            // 继续游戏：无任何存档时置灰不可点
+            if (continueGameButton != null)
+                continueGameButton.interactable = SaveLoadManager.HasAnySave();
         }
 
         private void BindButtons()
@@ -52,6 +68,25 @@ namespace SheNicest.UI
 
             if (panelClickCatcher != null)
                 panelClickCatcher.onClick.AddListener(CloseAllPanels);
+
+            if (newGameButton != null)
+                newGameButton.onClick.AddListener(OnNewGame);
+
+            if (continueGameButton != null)
+                continueGameButton.onClick.AddListener(OnContinueGame);
+
+            if (startPanelCloseButton != null)
+                startPanelCloseButton.onClick.AddListener(CloseAllPanels);
+
+            if (loadSaveCloseButton != null)
+                loadSaveCloseButton.onClick.AddListener(CloseAllPanels);
+
+            for (int i = 0; i < loadSlotButtons.Length; i++)
+            {
+                int slot = i + 1; // 闭包捕获槽位号
+                if (loadSlotButtons[i] != null)
+                    loadSlotButtons[i].onClick.AddListener(() => OnLoadSlotClick(slot));
+            }
         }
 
         private void OnDestroy()
@@ -79,9 +114,62 @@ namespace SheNicest.UI
 
             if (panelClickCatcher != null)
                 panelClickCatcher.onClick.RemoveListener(CloseAllPanels);
+
+            if (newGameButton != null)
+                newGameButton.onClick.RemoveListener(OnNewGame);
+
+            if (continueGameButton != null)
+                continueGameButton.onClick.RemoveListener(OnContinueGame);
+
+            if (startPanelCloseButton != null)
+                startPanelCloseButton.onClick.RemoveListener(CloseAllPanels);
+
+            if (loadSaveCloseButton != null)
+                loadSaveCloseButton.onClick.RemoveListener(CloseAllPanels);
+
+            // 槽位按钮用lambda绑定，只能整组清除（本组件为唯一接线方，无持久化调用）
+            for (int i = 0; i < loadSlotButtons.Length; i++)
+            {
+                if (loadSlotButtons[i] != null)
+                    loadSlotButtons[i].onClick.RemoveAllListeners();
+            }
         }
 
         private void OnStartGame()
+        {
+            // 不再直接进游戏：弹出「新游戏/继续游戏」子选项面板
+            CloseAllPanels();
+            if (startPanel != null)
+                startPanel.SetActive(true);
+            if (panelClickCatcher != null)
+                panelClickCatcher.gameObject.SetActive(true);
+        }
+
+        private void OnNewGame()
+        {
+            SaveLoadManager.pendingLoadSlot = SaveLoadManager.NoSlot;
+            LoadGameScene();
+        }
+
+        private void OnContinueGame()
+        {
+            if (!SaveLoadManager.HasAnySave()) return; // 双保险（Start已置灰）
+            CloseAllPanels();
+            RefreshLoadSlots();
+            if (loadSavePanel != null)
+                loadSavePanel.SetActive(true);
+            if (panelClickCatcher != null)
+                panelClickCatcher.gameObject.SetActive(true);
+        }
+
+        private void OnLoadSlotClick(int slot)
+        {
+            if (!SaveLoadManager.HasSave(slot)) return; // 空槽不可点
+            SaveLoadManager.pendingLoadSlot = slot;
+            LoadGameScene();
+        }
+
+        private void LoadGameScene()
         {
             if (!string.IsNullOrEmpty(gameSceneName) && Application.CanStreamedLevelBeLoaded(gameSceneName))
             {
@@ -90,6 +178,20 @@ namespace SheNicest.UI
             else
             {
                 Debug.LogWarning($"[MainMenu] Game scene '{gameSceneName}' not found or not in Build Settings.");
+            }
+        }
+
+        /// <summary>刷新「继续游戏」存档框：3个槽位的文字与可点状态（空槽置灰）。</summary>
+        private void RefreshLoadSlots()
+        {
+            for (int i = 0; i < loadSlotTexts.Length; i++)
+            {
+                int slot = i + 1;
+                bool hasSave = SaveLoadManager.HasSave(slot);
+                if (loadSlotTexts[i] != null)
+                    loadSlotTexts[i].text = $"存档{slot}：{SaveLoadManager.GetSlotDisplay(slot)}";
+                if (loadSlotButtons[i] != null)
+                    loadSlotButtons[i].interactable = hasSave;
             }
         }
 
@@ -130,6 +232,12 @@ namespace SheNicest.UI
 
             if (creditsPanel != null)
                 creditsPanel.SetActive(false);
+
+            if (startPanel != null)
+                startPanel.SetActive(false);
+
+            if (loadSavePanel != null)
+                loadSavePanel.SetActive(false);
 
             if (panelClickCatcher != null)
                 panelClickCatcher.gameObject.SetActive(false);

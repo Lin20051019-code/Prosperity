@@ -25,6 +25,9 @@ namespace SheNicest.UI
         [Header("Character Portraits")]
         [SerializeField] private List<Image> characterPortraits = new List<Image>();
 
+        [Header("Title")]
+        [SerializeField] private Text titleText; // 顶部标题（按角色显示）
+
         private bool isFlipping = false;
         private readonly List<GameObject> cardInfoTexts = new List<GameObject>();
 
@@ -32,6 +35,19 @@ namespace SheNicest.UI
         {
             BargainState.LoadDialogs();
             BargainState.InitFromBargainData();
+
+            // 按角色显示标题，让玩家明确自己是买方还是卖方
+            if (titleText != null)
+            {
+                if (BargainState.isAIVsAI)
+                    titleText.text = "AI 之间的讨价还价";
+                else if (BargainState.isPlayerSeller)
+                    titleText.text = "你是卖方——选择你的谈判策略";
+                else if (BargainState.isPlayerBuyer)
+                    titleText.text = "你是买方——选择你的谈判策略";
+                else
+                    titleText.text = "选择你的人格卡";
+            }
 
             SetupPortraits();
             SetupCardSprites();
@@ -51,13 +67,9 @@ namespace SheNicest.UI
                 return;
             }
 
-            // 设置卡背并启动翻转动画
+            // 设置卡背并直接展示策略（取消翻转动画，按钮立即可点）
             SetupCardBacks();
-            foreach (var btn in personalityCardButtons)
-            {
-                if (btn != null) btn.interactable = false;
-            }
-            StartCoroutine(CardFlipAnimation());
+            ShowCardsDirectly();
         }
 
         private void SetupPortraits()
@@ -89,8 +101,8 @@ namespace SheNicest.UI
         private void SetupCardBacks()
         {
             cardInfoTexts.Clear();
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            // WebGL 注意: 内置字体不含中文且打包后无系统字体兜底，必须加载项目字体
+            Font font = Resources.Load<Font>("VonwaonBitmap-16px");
 
             for (int i = 0; i < personalityCardImages.Count; i++)
             {
@@ -125,6 +137,27 @@ namespace SheNicest.UI
 
                 textObj.SetActive(false);
                 cardInfoTexts.Add(textObj);
+            }
+        }
+
+        /// <summary>直接展示策略卡背与数据文字（跳过翻转动画）</summary>
+        private void ShowCardsDirectly()
+        {
+            for (int i = 0; i < personalityCardImages.Count; i++)
+            {
+                if (personalityCardImages[i] == null) continue;
+                if (i < personalityBackSprites.Count && personalityBackSprites[i] != null)
+                {
+                    personalityCardImages[i].sprite = personalityBackSprites[i];
+                    personalityCardImages[i].overrideSprite = personalityBackSprites[i];
+                }
+                if (i < cardInfoTexts.Count && cardInfoTexts[i] != null)
+                    cardInfoTexts[i].SetActive(true);
+            }
+
+            foreach (var btn in personalityCardButtons)
+            {
+                if (btn != null) btn.interactable = true;
             }
         }
 
@@ -187,7 +220,7 @@ namespace SheNicest.UI
 
         private void SelectPersonality(int cardIndex)
         {
-            if (isFlipping) return;
+            if (isFlipping || BargainState.selectedCardIndex >= 0) return; // 防连点：选过即忽略，避免重复加载报价场景
             BargainState.selectedCardIndex = cardIndex;
             Debug.Log($"[BargainSelect] Player selected: {BargainState.cardNames[cardIndex]}");
 
@@ -196,15 +229,33 @@ namespace SheNicest.UI
             BargainState.aiCardIndex = BargainState.SelectAIPersonality(aiRep, aiSelf);
             Debug.Log($"[BargainSelect] AI selected: {BargainState.cardNames[BargainState.aiCardIndex]}");
 
+            // 记录双方所选人格卡，供回 GameScene 结算声望
+            if (BargainState.isPlayerSeller)
+            {
+                DiceRollController.BargainData.sellerCardIndex = cardIndex;
+                DiceRollController.BargainData.buyerCardIndex = BargainState.aiCardIndex;
+            }
+            else
+            {
+                DiceRollController.BargainData.sellerCardIndex = BargainState.aiCardIndex;
+                DiceRollController.BargainData.buyerCardIndex = cardIndex;
+            }
+
             // 加载报价场景
             SceneManager.LoadScene("讨价还价_报价");
         }
 
-        /// <summary>AI vs AI 自动结算</summary>
-        private void AutoResolveAndGotoResult()
+        /// <summary>AI vs AI 自动结算（不依赖本场景任何实例；供DiceRollController在GameScene内直接调用，
+        /// 跳过选卡场景加载——同步LoadScene下一帧才切换，选卡会渲染1~2帧造成"闪一下卡面朝上的选卡界面"）</summary>
+        public static void AutoResolve()
         {
+            BargainState.LoadDialogs();
+            BargainState.InitFromBargainData();
+
             int sellerCard = BargainState.SelectAIPersonality(BargainState.sellerRep, BargainState.sellerSelfInterest);
             int buyerCard = BargainState.SelectAIPersonality(BargainState.buyerRep, BargainState.buyerSelfInterest);
+            DiceRollController.BargainData.sellerCardIndex = sellerCard;
+            DiceRollController.BargainData.buyerCardIndex = buyerCard;
 
             float sOffer = BargainState.marketPrice * (1f + BargainState.firstRoundAdvantage[sellerCard] + BargainState.sellerRep / 200f);
             float bOffer = BargainState.marketPrice * (1f - BargainState.firstRoundAdvantage[buyerCard] - BargainState.buyerRep / 200f);
@@ -248,7 +299,19 @@ namespace SheNicest.UI
                 }
             }
 
+            // AI vs AI 的收尾台词（借卖方人格卡的成交/失败台词，v3移植）
+            BargainState.resultLine = BargainState.GetLine(
+                sellerCard, true, BargainState.resultSuccess ? "成交" : "失败",
+                opponentName: BargainState.buyerName,
+                final: BargainState.resultFinalPrice).text;
+
             Debug.Log($"[BargainSelect] AIvsAI result: success={BargainState.resultSuccess}, price={BargainState.resultFinalPrice}");
+        }
+
+        /// <summary>AI vs AI 自动结算后跳结果场景（选卡场景内兜底路径，正常流程已被DiceRollController直接调用AutoResolve后绕过）</summary>
+        private void AutoResolveAndGotoResult()
+        {
+            AutoResolve();
             SceneManager.LoadScene("讨价还价_结果");
         }
     }

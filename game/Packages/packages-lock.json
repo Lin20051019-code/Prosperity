@@ -5,7 +5,7 @@
       "depth": 0,
       "source": "local",
       "dependencies": {
-        "cn.tuanjie.codely.bridge": "1.0.69",
+        "cn.tuanjie.codely.bridge": "1.0.76",
         "com.unity.modules.jsonserialize": "1.0.0",
         "com.unity.modules.unitywebrequest": "1.0.0",
         "com.unity.modules.video": "1.0.0",
@@ -13,7 +13,7 @@
       }
     },
     "cn.tuanjie.codely.bridge": {
-      "version": "1.0.78",
+      "version": "1.0.81",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -21,15 +21,6 @@
         "com.unity.ugui": "1.0.0"
       },
       "url": "https://packages.unity.cn"
-    },
-    "cn.unity.uos.launcher": {
-      "version": "https://cnb.cool/unity/uos/UOSLauncher.git",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.2.1"
-      },
-      "hash": "76a5a7e54c24e8f428e43b5071892f60260beea2"
     },
     "com.tripo3d.unitybridge": {
       "version": "file:C:/Users/Lin20/Downloads/Tripo3d_Unity_Bridge-latest/Tripo3d_Unity_Bridge",
@@ -212,13 +203,6 @@
     "com.unity.mathematics": {
       "version": "1.2.6",
       "depth": 2,
-      "source": "registry",
-      "dependencies": {},
-      "url": "https://packages.unity.cn"
-    },
-    "com.unity.nuget.newtonsoft-json": {
-      "version": "3.2.1",
-      "depth": 1,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.cn"

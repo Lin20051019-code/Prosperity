@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -36,10 +34,10 @@ namespace SheNicest.UI
         [SerializeField] private Sprite eventSprite;
         [SerializeField] private Sprite rewardSprite;
 
-        [Header("Data Source")]
-        [SerializeField] private string penaltyCsvPath = "Assets/Data/penalty_events.csv";
-        [SerializeField] private string eventCsvPath = "Assets/Data/event_events.csv";
-        [SerializeField] private string rewardCsvPath = "Assets/Data/reward_events.csv";
+        [Header("Data Source (Resources 相对路径，不含扩展名)")]
+        [SerializeField] private string penaltyCsvPath = "Data/penalty_events";
+        [SerializeField] private string eventCsvPath = "Data/event_events";
+        [SerializeField] private string rewardCsvPath = "Data/reward_events";
 
         // 各类型事件池
         private List<PenaltyEventData> penaltyPool = new List<PenaltyEventData>();
@@ -87,26 +85,22 @@ namespace SheNicest.UI
         }
 
         /// <summary>
-        /// 从 CSV 文件加载惩罚事件数据。
+        /// 从 Resources 加载惩罚事件 CSV。
         /// CSV 格式: eventName,description,effectType,cashChange,reputationChange,skipNextTurn,effectDescription
         /// </summary>
-        private List<PenaltyEventData> LoadCSV(string path)
+        /// <param name="resourcePath">Resources 下的相对路径（不含扩展名），如 Data/penalty_events</param>
+        private List<PenaltyEventData> LoadCSV(string resourcePath)
         {
             var pool = new List<PenaltyEventData>();
 
-            if (!File.Exists(path))
+            var csv = Resources.Load<TextAsset>(resourcePath);
+            if (csv == null)
             {
-                Debug.LogError($"[CardPanel] CSV not found: {path}");
+                Debug.LogError($"[CardPanel] CSV not found in Resources: {resourcePath}");
                 return pool;
             }
 
-            var lines = new List<string>();
-            using (var reader = new StreamReader(path, new UTF8Encoding(false)))
-            {
-                string line;
-                while ((line = reader.ReadLine()) != null)
-                    lines.Add(line);
-            }
+            var lines = new List<string>(csv.text.Split('\n'));
             if (lines.Count < 2) return pool;
 
             for (int i = 1; i < lines.Count; i++)
@@ -137,7 +131,7 @@ namespace SheNicest.UI
                 pool.Add(data);
             }
 
-            Debug.Log($"[CardPanel] Loaded {pool.Count} events from {path}");
+            Debug.Log($"[CardPanel] Loaded {pool.Count} events from {resourcePath}");
             return pool;
         }
 
@@ -166,8 +160,6 @@ namespace SheNicest.UI
             return result.ToArray();
         }
 
-        /// <summary>
-        /// 弹出惩罚卡牌，随机抽取一个事件
         /// <summary>
         /// 弹出卡牌面板，按类型选择事件池
         /// </summary>

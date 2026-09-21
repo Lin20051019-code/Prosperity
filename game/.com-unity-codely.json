@@ -1,10 +1,10 @@
 {
-  "unity_port": 65413,
-  "stream_port": 49680,
+  "unity_port": -1,
+  "stream_port": 49776,
   "created_date": "2026-08-27T02:52:28.833Z",
   "project_path": "E:/project/SheNicest/unity/SheNicest/game/Assets",
   "reloading": false,
-  "reason": "ready",
-  "seq": 111482,
-  "last_heartbeat": "2026-08-29T17:43:21.991Z"
+  "reason": "package_updating",
+  "seq": 332,
+  "last_heartbeat": "2026-09-12T04:28:19.684Z"
 }

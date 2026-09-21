@@ -111,10 +111,11 @@ namespace SheNicest.UI
             var canvas = FindObjectOfType<Canvas>();
             if (canvas == null) return;
 
-            // Load wooden tooltip background sprite
-            var bgSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/图片/文本框.png");
-            // Load VonwaonBitmap font
-            var font = UnityEditor.AssetDatabase.LoadAssetAtPath<Font>("Assets/字体/VonwaonBitmap/VonwaonBitmap-16px.ttf");
+            Sprite bgSprite = null;
+            Font font = null;
+            // WebGL 注意: AssetDatabase 仅编辑器可用，改用 Resources.Load 保证打包后可用
+            bgSprite = Resources.Load<Sprite>("文本框");
+            font = Resources.Load<Font>("VonwaonBitmap-16px");
 
             tooltipPanel = new GameObject("TileTooltip", typeof(RectTransform), typeof(Image));
             tooltipPanel.transform.SetParent(canvas.transform, false);
@@ -143,7 +144,6 @@ namespace SheNicest.UI
             tooltipText.color = new Color(0.35f, 0.16f, 0.06f); // 深棕色
             tooltipText.lineSpacing = 1.2f;
             if (font != null) tooltipText.font = font;
-            else tooltipText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             tooltipText.raycastTarget = false;
 
             tooltipPanel.SetActive(false);
