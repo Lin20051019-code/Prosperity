@@ -229,18 +229,62 @@ GitHub **免费个人账号没有"分支保护"功能**，因此：
 
 ---
 
-## 八、遇到问题怎么办
+## 八、网络与代理（国内必看）
+
+国内直连 GitHub 极不稳定，典型症状：
+
+```
+fatal: unable to access '...': Recv failure: Connection was reset
+fatal: Failed to connect to github.com port 443 after 21065 ms
+```
+
+**实测数据**：不开代理时 3 次测试只成功 1 次；开代理后 **5 次全部成功**。
+
+### 8.1 配置代理（每人做一次）
+
+先打开你的代理软件（Clash / v2ray 等），确认它的**本地端口**。
+Clash Verge 默认是 `7890`，可以在「设置 → 系统代理」看到，或看下图位置：
+
+```bash
+git config --global http.proxy  http://127.0.0.1:7890
+git config --global https.proxy http://127.0.0.1:7890
+```
+
+把 `7890` 换成你自己代理的实际端口。
+
+### 8.2 验证代理是否生效
+
+```bash
+git ls-remote https://github.com/Lin20051019-code/Prosperity HEAD
+```
+
+能打印出一串提交哈希（40 位）就说明通了。
+
+### 8.3 不想用代理时取消
+
+```bash
+git config --global --unset http.proxy
+git config --global --unset https.proxy
+```
+
+> ⚠️ 注意：代理配置是 `--global`（整台电脑的 git 都生效），
+> **GitHub Desktop 也会跟着用这个代理**，所以配一次两边都好用。
+
+---
+
+## 九、遇到问题怎么办
 
 | 报错关键词 | 原因 | 解决 |
 |---|---|---|
-| `schannel` / 无法连接 github.com | 网络被墙 | 开代理，然后 `git config --global http.proxy http://127.0.0.1:端口` |
+| `schannel` / `Connection was reset` / 443 超时 | 网络被墙 | 按第八节配置代理 |
 | `Authentication failed` | 登录过期 | `git credential-manager github logout` 后重新推送 |
 | `rejected` / `fetch first` | 队友有新提交 | 先 `git pull --rebase` 再 `git push` |
+| `Repository not found` | 仓库改过名，本地地址没更新 | `git remote set-url origin <新地址>` |
 | `CONFLICT` 冲突 | 两人改了同一处 | **别自己乱改**，先告诉我，我帮你分析 |
 
 ---
 
-## 九、常用命令速查
+## 十、常用命令速查
 
 ```bash
 git status          # 看当前改了什么
