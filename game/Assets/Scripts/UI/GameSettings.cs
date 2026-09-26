@@ -29,6 +29,15 @@ namespace SheNicest.UI
             set => PlayerPrefs.SetFloat(KeySFXVolume, Mathf.Clamp01(value));
         }
 
+        private const string KeyLlmDialogs = "LlmDialogsEnabled";
+
+        /// <summary>讨价还价AI台词是否用LLM生成（默认关；关闭/失败时回落CSV台词池）。</summary>
+        public static bool LlmDialogsEnabled
+        {
+            get => PlayerPrefs.GetInt(KeyLlmDialogs, 0) == 1;
+            set => PlayerPrefs.SetInt(KeyLlmDialogs, value ? 1 : 0);
+        }
+
         /// <summary>分辨率索引（对应 Screen.resolutions 数组）。</summary>
         public static int ResolutionIndex
         {

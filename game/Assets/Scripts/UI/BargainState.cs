@@ -32,6 +32,10 @@ namespace SheNicest.UI
         public static float sellerOffer;
         public static float buyerOffer;
 
+        // ===== LLM台词试点（2026-09-25）=====
+        public static string tileName;        // 交易名下房产名（LLM台词上下文用）
+        public static float aiAttitudeAdjust; // LLM态度→AI让步率修正（±0.05，带1轮滞后；0=不修正/已回落）
+
         // ===== 结果 =====
         public static bool resultCompleted;
         public static bool resultSuccess;
@@ -81,6 +85,7 @@ namespace SheNicest.UI
             playerIsBuyer = DiceRollController.BargainData.playerIsBuyer;
             sellerName = DiceRollController.BargainData.sellerName;
             buyerName = DiceRollController.BargainData.buyerName;
+            tileName = DiceRollController.BargainData.tileName;
 
             isPlayerBuyer = playerIsBuyer;
             isPlayerSeller = !playerIsBuyer && sellerIndex == 0;
@@ -93,6 +98,7 @@ namespace SheNicest.UI
             buyerOffer = 0;
             resultCompleted = false;
             resultLine = null;
+            aiAttitudeAdjust = 0f;
         }
 
         /// <summary>AI选择人格卡</summary>

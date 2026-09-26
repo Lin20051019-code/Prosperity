@@ -199,10 +199,10 @@ ui_player_fallback,Player {n}
 ui_seller,the seller
 bargain_note_saved,market {market} yuan — saved {pct}%
 bargain_note_overpaid,above market ({market} yuan) — overpaid…
-broadcast_deal_done,[DEAL] {buyer} purchased plot {tile} for {price} yuan ({note})
+broadcast_deal_done,[DEAL] {buyer} purchased {seller}'s property for {price} yuan ({note})
 ui_prosperity,Prosperity {value}{arrow} | {phase}{rule}
-result_success_line,{quote}Deal closed!\n{buyer} purchased {tile} (from {seller}) for {price} yuan{role}
-result_fail_line,{quote}Negotiation failed\n{buyer} must pay {seller} rent for {tile}{role}
+result_success_line,{quote}Deal closed!\n{buyer} purchased {seller}'s property for {price} yuan{role}
+result_fail_line,{quote}Negotiation failed\n{buyer} must pay {seller} rent for their property{role}
 card_adv,First-round advantage: {adv}
 card_rate,Concession rate: {rate}
 card_rep,Reputation: {rep}
@@ -210,7 +210,7 @@ tile_building_info,Building (Lv.{level}) — Owner: {owner} — Market: {market}
 
 # ===== v4.2 合并新增（团队功能接线的词条）=====
 broadcast_load_save,Save loaded — resuming from round {round}
-broadcast_bargain_lose2,[DEAL] Failed — {buyer} paid {rent} yuan rent to {seller} for {tile}
+broadcast_bargain_lose2,[DEAL] Failed — {buyer} paid {rent} yuan rent to {seller} for their property
 ui_gov,the government
 ui_test_bargain_1,[TEST] Straight to bargain: AI buys player property
 ui_test_bargain_2,[TEST] Second bargain: player buys AI property

@@ -83,6 +83,8 @@ namespace SheNicest.UI
                 sfxVolumeSlider.onValueChanged.AddListener(OnSFXVolumeChanged);
             }
 
+            CreateLlmToggle();
+
             if (settingsPanel != null)
                 settingsPanel.SetActive(false);
         }
@@ -103,6 +105,7 @@ namespace SheNicest.UI
             if (cancelOverwriteButton != null) cancelOverwriteButton.onClick.RemoveListener(OnCancelOverwrite);
             if (bgmVolumeSlider != null) bgmVolumeSlider.onValueChanged.RemoveListener(OnBGMVolumeChanged);
             if (sfxVolumeSlider != null) sfxVolumeSlider.onValueChanged.RemoveListener(OnSFXVolumeChanged);
+            if (llmToggleButton != null) llmToggleButton.onClick.RemoveListener(OnLlmToggle);
         }
 
         private void OpenPanel()
@@ -257,6 +260,59 @@ namespace SheNicest.UI
         {
             if (saveHintText != null)
                 saveHintText.text = message;
+        }
+
+        // ==================== LLM台词试点：AI台词开关（运行时创建按钮，场景零改动）====================
+
+        private Button llmToggleButton;
+        private Text llmToggleText;
+
+        /// <summary>设置面板内动态创建「AI台词」开关（WebGL不支持LLM，不创建）。</summary>
+        private void CreateLlmToggle()
+        {
+            if (settingsPanel == null) return;
+            if (Application.platform == RuntimePlatform.WebGLPlayer) return;
+
+            var btnObj = new GameObject("LlmDialogToggle", typeof(Image), typeof(Button));
+            btnObj.transform.SetParent(settingsPanel.transform, false);
+            var rt = btnObj.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(0f, -330f);
+            rt.sizeDelta = new Vector2(240f, 60f);
+
+            // #7E4A30 棕底白字，与面板内其它按钮同款
+            var img = btnObj.GetComponent<Image>();
+            img.color = new Color(126f / 255f, 74f / 255f, 48f / 255f);
+
+            var txtObj = new GameObject("Text");
+            txtObj.transform.SetParent(btnObj.transform, false);
+            llmToggleText = txtObj.AddComponent<Text>();
+            llmToggleText.font = BargainState.GetSafeFont();
+            llmToggleText.fontSize = 28;
+            llmToggleText.alignment = TextAnchor.MiddleCenter;
+            llmToggleText.color = Color.white;
+            var trt = llmToggleText.rectTransform;
+            trt.anchorMin = Vector2.zero;
+            trt.anchorMax = Vector2.one;
+            trt.offsetMin = Vector2.zero;
+            trt.offsetMax = Vector2.zero;
+
+            llmToggleButton = btnObj.GetComponent<Button>();
+            llmToggleButton.onClick.AddListener(OnLlmToggle);
+            RefreshLlmToggleLabel();
+        }
+
+        private void OnLlmToggle()
+        {
+            GameSettings.LlmDialogsEnabled = !GameSettings.LlmDialogsEnabled;
+            GameSettings.Save();
+            RefreshLlmToggleLabel();
+        }
+
+        private void RefreshLlmToggleLabel()
+        {
+            if (llmToggleText != null)
+                llmToggleText.text = GameSettings.LlmDialogsEnabled ? "AI台词：开" : "AI台词：关";
         }
     }
 }

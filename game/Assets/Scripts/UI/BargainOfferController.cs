@@ -352,8 +352,12 @@ namespace SheNicest.UI
             float buyerDiff = BargainState.sellerOffer - BargainState.buyerOffer;
             float sellerDiff = BargainState.buyerOffer - BargainState.sellerOffer;
 
+            // 对手（玩家）改价前的报价，供LLM台词描述本轮让步幅度
+            float oppPrevOffer = BargainState.isPlayerBuyer ? BargainState.buyerOffer : BargainState.sellerOffer;
+
             float playerRate = BargainState.priceChangeRate[BargainState.selectedCardIndex];
-            float aiRate = BargainState.priceChangeRate[BargainState.aiCardIndex];
+            // LLM态度修正（±5%，来自AI上一句话）叠加到AI让步率；未启用/回落时为0
+            float aiRate = BargainState.priceChangeRate[BargainState.aiCardIndex] + BargainState.aiAttitudeAdjust;
 
             if (BargainState.isPlayerBuyer)
             {
@@ -379,6 +383,13 @@ namespace SheNicest.UI
             int diff = Mathf.RoundToInt(Mathf.Abs(BargainState.sellerOffer - BargainState.buyerOffer));
             string aiName = BargainState.isPlayerBuyer ? BargainState.sellerName : BargainState.buyerName;
 
+            // AI反应台词：LLM预取与玩家台词显示并行（第一层试点；失败/超时回落CSV台词池）
+            float movePct = Mathf.Clamp01(factor + playerRate);
+            string reactionStage = BargainState.ReactionStage(movePct);
+            LlmDialogService.Fetch aiFetch = StartAiLineFetch(
+                stage: reactionStage, roundNo: BargainState.currentRound + 1,
+                aiPrice: aiPrice, oppPrev: Mathf.RoundToInt(oppPrevOffer), oppNew: playerPrice, diff: diff);
+
             // 玩家说出自己的让步姿态（选项1~3）
             var playerLine = BargainState.GetLine(
                 BargainState.selectedCardIndex, BargainState.isPlayerSeller,
@@ -387,13 +398,13 @@ namespace SheNicest.UI
             if (!string.IsNullOrEmpty(playerLine.text))
                 yield return ShowDialogCoroutine(playerIdx, playerLine, 2.5f);
 
-            // AI根据玩家的让步幅度做出反应
-            float movePct = Mathf.Clamp01(factor + playerRate);
-            var aiLine = BargainState.GetLine(
+            if (aiFetch != null)
+                yield return LlmDialogService.WaitFor(aiFetch, 2.5f);
+            var aiLine = TakeLlmOrCsv(aiFetch, BargainState.GetLine(
                 BargainState.aiCardIndex, !BargainState.isPlayerSeller,
-                BargainState.ReactionStage(movePct),
+                reactionStage,
                 opponentName: BargainState.isPlayerBuyer ? BargainState.buyerName : BargainState.sellerName,
-                myPrice: aiPrice, diff: diff);
+                myPrice: aiPrice, diff: diff));
             if (!string.IsNullOrEmpty(aiLine.text))
                 yield return ShowDialogCoroutine(aiIdx, aiLine, 2.5f);
 
@@ -421,19 +432,52 @@ namespace SheNicest.UI
 
         private IEnumerator ShowFirstRoundDialog()
         {
-            int sellerCard = BargainState.isPlayerSeller ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
-            var sellerLine = BargainState.GetLine(sellerCard, true, "开场",
-                opponentName: BargainState.buyerName,
-                myPrice: Mathf.RoundToInt(BargainState.sellerOffer));
-            if (!string.IsNullOrEmpty(sellerLine.text) && BargainState.sellerIndex < characterPortraits.Count)
-                yield return ShowDialogCoroutine(BargainState.sellerIndex, sellerLine, 2.5f);
+            // LLM预取/等待期间禁止点报价，防开场台词与反应台词演出交叠（等待最长约5秒）
+            offerBusy = true;
+            try
+            {
+                int sellerCard = BargainState.isPlayerSeller ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
+                int buyerCard = BargainState.isPlayerBuyer ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
 
-            int buyerCard = BargainState.isPlayerBuyer ? BargainState.selectedCardIndex : BargainState.aiCardIndex;
-            var buyerLine = BargainState.GetLine(buyerCard, false, "开场",
-                opponentName: BargainState.sellerName,
-                myPrice: Mathf.RoundToInt(BargainState.buyerOffer));
-            if (!string.IsNullOrEmpty(buyerLine.text) && BargainState.buyerIndex < characterPortraits.Count)
-                yield return ShowDialogCoroutine(BargainState.buyerIndex, buyerLine, 2.5f);
+                // AI侧开场台词LLM预取（玩家侧台词保持CSV台词池不变）
+                bool aiIsSeller = !BargainState.isPlayerSeller && !BargainState.isAIVsAI;
+                int aiOpeningPrice = aiIsSeller ? Mathf.RoundToInt(BargainState.sellerOffer) : Mathf.RoundToInt(BargainState.buyerOffer);
+                int oppOpeningPrice = aiIsSeller ? Mathf.RoundToInt(BargainState.buyerOffer) : Mathf.RoundToInt(BargainState.sellerOffer);
+                LlmDialogService.Fetch aiFetch = StartAiLineFetch(
+                    stage: "开场", roundNo: 1,
+                    aiPrice: aiOpeningPrice, oppPrev: oppOpeningPrice, oppNew: oppOpeningPrice,
+                    diff: Mathf.RoundToInt(Mathf.Abs(BargainState.sellerOffer - BargainState.buyerOffer)));
+
+                var sellerLine = BargainState.GetLine(sellerCard, true, "开场",
+                    opponentName: BargainState.buyerName,
+                    myPrice: Mathf.RoundToInt(BargainState.sellerOffer));
+                if (!string.IsNullOrEmpty(sellerLine.text) && BargainState.sellerIndex < characterPortraits.Count)
+                {
+                    if (aiIsSeller && aiFetch != null)
+                    {
+                        yield return LlmDialogService.WaitFor(aiFetch, 5f);
+                        sellerLine = TakeLlmOrCsv(aiFetch, sellerLine);
+                    }
+                    yield return ShowDialogCoroutine(BargainState.sellerIndex, sellerLine, 2.5f);
+                }
+
+                var buyerLine = BargainState.GetLine(buyerCard, false, "开场",
+                    opponentName: BargainState.sellerName,
+                    myPrice: Mathf.RoundToInt(BargainState.buyerOffer));
+                if (!string.IsNullOrEmpty(buyerLine.text) && BargainState.buyerIndex < characterPortraits.Count)
+                {
+                    if (!aiIsSeller && aiFetch != null)
+                    {
+                        yield return LlmDialogService.WaitFor(aiFetch, 5f);
+                        buyerLine = TakeLlmOrCsv(aiFetch, buyerLine);
+                    }
+                    yield return ShowDialogCoroutine(BargainState.buyerIndex, buyerLine, 2.5f);
+                }
+            }
+            finally
+            {
+                offerBusy = false;
+            }
         }
 
         private void GotoResult(bool success, int finalPrice)
@@ -568,6 +612,80 @@ namespace SheNicest.UI
                 dialogRt.anchoredPosition = new Vector2(portraitRt.anchoredPosition.x, portraitRt.anchoredPosition.y + 600f);
             else
                 dialogRt.anchoredPosition = new Vector2(portraitRt.anchoredPosition.x, portraitRt.anchoredPosition.y - 600f);
+        }
+
+        // ==================== LLM台词试点（2026-09-25，第一层：只产台词，决策仍确定性）====================
+
+        /// <summary>AI谈判卡人格描述（LLM system prompt用），索引对应BargainState.cardNames</summary>
+        private static readonly string[] CardPersonas =
+        {
+            "热情随和，重视关系口碑，愿意让利交朋友",
+            "务实冷静，讲究行情公道，不占便宜也不吃亏",
+            "精明势利，会掂量对手身份身家，见人下菜碟",
+            "强硬贪婪，寸土不让，认定的事绝不松口",
+        };
+
+        /// <summary>启动AI台词LLM预取；开关关/已熔断/AIvsAI返回null（调用方直接走CSV）</summary>
+        private LlmDialogService.Fetch StartAiLineFetch(string stage, int roundNo, int aiPrice, int oppPrev, int oppNew, int diff)
+        {
+            if (BargainState.isAIVsAI) return null;
+            if (!LlmDialogService.IsEnabled) return null;
+            bool aiIsSeller = !BargainState.isPlayerSeller;
+            return LlmDialogService.StartFetch(this, BuildLlmSystemPrompt(aiIsSeller), BuildLlmUserPrompt(stage, roundNo, aiPrice, oppPrev, oppNew, diff));
+        }
+
+        /// <summary>LLM成功→用LLM台词+情绪，态度落成±5%让步率修正（作用于下轮报价）；失败→回落CSV并清零修正</summary>
+        private BargainState.DialogLine TakeLlmOrCsv(LlmDialogService.Fetch fetch, BargainState.DialogLine csvLine)
+        {
+            if (fetch != null && fetch.done && fetch.ok)
+            {
+                BargainState.aiAttitudeAdjust = fetch.attitude * LlmDialogService.AttitudeToRateRange;
+                Debug.Log($"[LlmDialog] 采用LLM台词，下轮AI让步率修正={BargainState.aiAttitudeAdjust:F3}");
+                return new BargainState.DialogLine { text = fetch.text, emotion = fetch.emotion };
+            }
+            BargainState.aiAttitudeAdjust = 0f;
+            return csvLine;
+        }
+
+        private string BuildLlmSystemPrompt(bool aiIsSeller)
+        {
+            string aiName = aiIsSeller ? BargainState.sellerName : BargainState.buyerName;
+            string oppName = aiIsSeller ? BargainState.buyerName : BargainState.sellerName;
+            int rep = aiIsSeller ? BargainState.sellerRep : BargainState.buyerRep;
+            int selfInterest = aiIsSeller ? BargainState.sellerSelfInterest : BargainState.buyerSelfInterest;
+            string role = aiIsSeller ? "卖方（想把房产卖出好价钱）" : "买方（想低价买下房产）";
+            int personaIdx = Mathf.Clamp(BargainState.aiCardIndex, 0, CardPersonas.Length - 1);
+            string lang = BargainState.language == "en" ? "English" : "中文";
+
+            return
+                $"你在像素风大富翁游戏《繁荣》的讨价还价场景中扮演NPC角色「{aiName}」，正与玩家「{oppName}」当面砍价。\n" +
+                $"你的性格：{CardPersonas[personaIdx]}。你当前声望{rep}，利己程度{selfInterest}，本次是{role}。\n" +
+                $"交易标的：{BargainState.sellerName}的房产（市场价约{BargainState.marketPrice}元）。\n" +
+                "严格按以下要求输出：\n" +
+                "1. 只输出一个JSON对象，格式为 {\"text\":\"台词\",\"emotion\":\"平\",\"attitude\":0.0}，不要输出任何其它内容。\n" +
+                $"2. 台词用{lang}，一句话，不超过24个字，符合角色口吻，可以带点市井气。\n" +
+                "3. 台词中只允许提到我给你的报价数字，严禁编造其它任何金额或数字。\n" +
+                "4. emotion四选一：平=平静，怒=生气，惊=意外，意=得意。\n" +
+                "5. attitude表示让步意愿：-1=强硬不让步，1=很愿意让步，取-1到1之间的小数。";
+        }
+
+        private string BuildLlmUserPrompt(string stage, int roundNo, int aiPrice, int oppPrev, int oppNew, int diff)
+        {
+            if (stage == "开场")
+            {
+                return $"第1轮开场。你方开价{aiPrice}元，对方开价{oppNew}元，价差约{diff}元。" +
+                    "说一句开场白表明你的要价/出价态度。只输出JSON对象。";
+            }
+            string moveDesc;
+            switch (stage)
+            {
+                case "让步低": moveDesc = "对方让步很小，几乎没动"; break;
+                case "让步中": moveDesc = "对方让步了一部分"; break;
+                case "让步高": moveDesc = "对方大幅让步，很有诚意"; break;
+                default: moveDesc = "对方维持原报价"; break;
+            }
+            return $"第{roundNo}轮报价。你方报价{aiPrice}元。对方刚把报价从{oppPrev}元改到{oppNew}元（{moveDesc}），目前价差约{diff}元。" +
+                "对对方这次的让步说一句回应，符合你的性格和当前情绪。只输出JSON对象。";
         }
     }
 }

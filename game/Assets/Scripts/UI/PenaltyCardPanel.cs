@@ -44,6 +44,10 @@ namespace SheNicest.UI
         private List<PenaltyEventData> eventPool = new List<PenaltyEventData>();
         public List<PenaltyEventData> rewardPool = new List<PenaltyEventData>();
 
+        // 调试面板用：暴露三个卡池（rewardPool 本为 public）
+        public List<PenaltyEventData> PenaltyPool => penaltyPool;
+        public List<PenaltyEventData> EventPool => eventPool;
+
         // 当前使用的池和类型
         private List<PenaltyEventData> currentPool;
         private CardType currentType;

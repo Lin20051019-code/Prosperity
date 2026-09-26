@@ -161,6 +161,12 @@ namespace SheNicest.UI
                 Dice3D.EnsureView(dicePanel, canvas); // 视效v2：3D像素骰子（场景里可调 Dice3DViewport）
             }
 
+            // 调试面板（同时按 A+S+D 呼出）：运行时创建，场景零改动（见 DebugPanelController）
+            DebugPanelController.EnsureCreated(this, penaltyCardPanel);
+
+            // 氛围层（播报文档v2.0第四节）：危机雨+冷蓝暗角/冲刺光束+暖金暗角+光点；换挡在RefreshPhase通知
+            AtmosphereController.EnsureCreated();
+
             // 存档读取（主菜单「继续游戏」进入），优先于Bargain临时态恢复
             if (SaveLoadManager.pendingLoadSlot != SaveLoadManager.NoSlot)
             {
@@ -1185,7 +1191,9 @@ namespace SheNicest.UI
         /// </summary>
         private void ApplyEventEffect(PenaltyEventData eventData, int triggerTokenIndex)
         {
-            string name = eventData.eventName;
+            // v4.2英文模块修复：Custom事件按逻辑键EventKey匹配（英文局eventName=英文显示名会失配；
+            // EventKey=eventKey列的中文键，zh局eventKey为空时回退eventName，中英两局都命中）
+            string name = eventData.EventKey;
 
             switch (eventData.effectType)
             {
@@ -1366,7 +1374,8 @@ namespace SheNicest.UI
         /// </summary>
         private void ApplyRewardEffect(PenaltyEventData eventData, int tokenIndex)
         {
-            string name = eventData.eventName;
+            // 同ApplyEventEffect：Custom事件按逻辑键EventKey匹配，防英文局显示名失配
+            string name = eventData.EventKey;
 
             switch (eventData.effectType)
             {
@@ -2380,6 +2389,8 @@ namespace SheNicest.UI
                 }
             }
             currentPhase = phase;
+            // 氛围层换挡（文档第四节：危机=雨+冷蓝暗角，冲刺=光束+暖金暗角+光点；渐变约1s）
+            AtmosphereController.SetPhase(phase == GamePhase.Crisis, phase == GamePhase.Sprint);
         }
 
         /// <summary>当前阶段工资（危机/常规300，冲刺325）（v3移植）</summary>
@@ -2883,6 +2894,104 @@ namespace SheNicest.UI
             BroadcastMsg(I18n.T("broadcast_rep_change", $"{pd.playerName} ({BargainState.cardNames[cardIdx]}) 声望{(rep >= 0 ? "+" : "")}{rep}", ("player", pd.playerName), ("delta", (rep >= 0 ? "+" : "") + rep), ("card", I18n.T("card_" + cardIdx, BargainState.cardNames[cardIdx]))));
         }
 
+        // ==================== 调试面板 API（DebugPanelController 使用） ====================
+        // 只做参数校验+转发，效果与砍价逻辑本身一行不改。
+
+        /// <summary>调试面板：房产条目（卖方名下可交易房产）</summary>
+        public class DebugPropertyInfo
+        {
+            public int tileIndex;
+            public string tileName;
+            public int level;
+            public int marketPrice;
+        }
+
+        /// <summary>调试面板：当前是否空闲（与CanSaveNow同判定：玩家回合且无任何进行中动作）</summary>
+        public bool DebugIsIdle => CanSaveNow;
+
+        /// <summary>调试面板：读取角色数据（名字/现金/声望/存活）</summary>
+        public PlayerData DebugGetPlayerData(int idx)
+        {
+            return (idx >= 0 && idx < playerInfoPanels.Count && playerInfoPanels[idx] != null) ? playerInfoPanels[idx].Data : null;
+        }
+
+        /// <summary>调试面板：应用四名角色现金/声望（声望clamp 0~100；现金允许负数，可顺带验证破产链路）</summary>
+        public void DebugSetPlayerValues(int[] cash, int[] rep)
+        {
+            for (int i = 0; i < playerInfoPanels.Count && i < 4; i++)
+            {
+                if (playerInfoPanels[i] == null) continue;
+                var pd = playerInfoPanels[i].Data;
+                if (cash != null && i < cash.Length) pd.cash = cash[i];
+                if (rep != null && i < rep.Length) pd.reputation = Mathf.Clamp(rep[i], 0, 100);
+                playerInfoPanels[i].UpdateDisplay();
+            }
+            UpdateProsperity();
+            Debug.Log("[DebugPanel] Player values applied");
+        }
+
+        /// <summary>调试面板：立即触发一张指定卡（惩罚/奖励作用于targetIdx；事件为全局效果）</summary>
+        public void DebugApplyCard(PenaltyCardPanel.CardType kind, PenaltyEventData evt, int targetIdx)
+        {
+            if (evt == null) return;
+            switch (kind)
+            {
+                case PenaltyCardPanel.CardType.Penalty:
+                    if (targetIdx < 0 || targetIdx >= playerInfoPanels.Count || playerInfoPanels[targetIdx] == null) return;
+                    ApplyPenaltyEffect(targetIdx, evt);
+                    BroadcastMsg($"[调试] {playerInfoPanels[targetIdx].Data.playerName} 触发惩罚：{evt.eventName} — {evt.effectDescription}");
+                    break;
+                case PenaltyCardPanel.CardType.Reward:
+                    if (targetIdx < 0 || targetIdx >= playerInfoPanels.Count || playerInfoPanels[targetIdx] == null) return;
+                    ApplyRewardEffect(evt, targetIdx);
+                    BroadcastMsg($"[调试] {playerInfoPanels[targetIdx].Data.playerName} 获得奖励：{evt.eventName} — {evt.effectDescription}");
+                    break;
+                case PenaltyCardPanel.CardType.Event:
+                    ApplyEventEffect(evt, targetIdx >= 0 ? targetIdx : 0);
+                    BroadcastMsg($"[调试] 触发全局事件：{evt.eventName} — {evt.effectDescription}");
+                    break;
+            }
+        }
+
+        /// <summary>调试面板：卖方名下可交易房产列表（level>0 且归属该玩家）</summary>
+        public List<DebugPropertyInfo> DebugGetOwnedTiles(int sellerIdx)
+        {
+            var list = new List<DebugPropertyInfo>();
+            if (buildingData == null) return list;
+            for (int i = 0; i < buildingData.Length && i < tilePath.Count; i++)
+            {
+                if (buildingData[i] == null || tilePath[i] == null) continue;
+                if (buildingData[i].ownerIndex != sellerIdx || buildingData[i].level <= 0) continue;
+                list.Add(new DebugPropertyInfo
+                {
+                    tileIndex = i,
+                    tileName = tilePath[i].name,
+                    level = buildingData[i].level,
+                    marketPrice = buildingData[i].GetMarketPrice(currentProsperity),
+                });
+            }
+            return list;
+        }
+
+        /// <summary>调试面板：直接发起砍价（买方=buyerIdx；需DebugIsIdle，标的必须为他人房产且双方在场）</summary>
+        public bool DebugStartBargain(int tileIdx, int buyerIdx)
+        {
+            if (!DebugIsIdle) return false;
+            if (buildingData == null || tileIdx < 0 || tileIdx >= buildingData.Length) return false;
+            if (buyerIdx < 0 || buyerIdx >= playerInfoPanels.Count || playerInfoPanels[buyerIdx] == null) return false;
+
+            var data = buildingData[tileIdx];
+            int sellerIdx = data != null ? data.ownerIndex : -1;
+            if (sellerIdx < 0 || sellerIdx == buyerIdx) return false;
+            if (sellerIdx >= playerInfoPanels.Count || playerInfoPanels[sellerIdx] == null) return false;
+            if (!playerInfoPanels[buyerIdx].Data.alive || !playerInfoPanels[sellerIdx].Data.alive) return false;
+
+            Debug.Log($"[DebugPanel] Start bargain: tile={tileIdx} buyer={buyerIdx} seller={sellerIdx}");
+            StartBargain(tileIdx, buyerIdx, data);
+            return true;
+        }
+        // ==================== 调试面板 API 结束 ====================
+
         // ===== 测试模式：跨场景Bargain测试状态（Bargain为全场景切换，实例字段会销毁，进度需静态保存） =====
         public static class TestBargainState
         {
@@ -3087,7 +3196,7 @@ namespace SheNicest.UI
                         FlyMoney(playerInfoPanels[buyerIndex].transform as RectTransform,
                                  sellerIndex >= 0 ? playerInfoPanels[sellerIndex].transform as RectTransform : tilePath[tileIndex] as RectTransform,
                                  finalPrice, sellerIndex >= 0 ? playerInfoPanels[sellerIndex] : null);
-                        BroadcastMsg(I18n.T("broadcast_deal_done", $"【交易】{buyerData.playerName} 以{finalPrice}元购得 {BargainData.tileName}（原属 {sellerData?.playerName ?? "政府"}，{dealNote}）", ("buyer", buyerData.playerName), ("price", finalPrice), ("tile", BargainData.tileName), ("seller", sellerData?.playerName ?? I18n.T("ui_gov", "政府")), ("note", dealNote)), BroadcastBar.P1);
+                        BroadcastMsg(I18n.T("broadcast_deal_done", $"【交易】{buyerData.playerName} 以{finalPrice}元购得 {sellerData?.playerName ?? "政府"}的房产（{dealNote}）", ("buyer", buyerData.playerName), ("price", finalPrice), ("seller", sellerData?.playerName ?? I18n.T("ui_gov", "政府")), ("note", dealNote)), BroadcastBar.P1);
                     }
                 }
             }
@@ -3111,7 +3220,7 @@ namespace SheNicest.UI
                             playerInfoPanels[sellerIndex].UpdateDisplay(); UpdateProsperity();
                         }
                         playerInfoPanels[buyerIndex].UpdateDisplay(); UpdateProsperity();
-                        BroadcastMsg(I18n.T("broadcast_bargain_lose2", $"Bargain失败，{buyerData.playerName} 向 {sellerData?.playerName ?? "政府"} 支付 {BargainData.tileName} 租金{rent}元", ("buyer", buyerData.playerName), ("seller", sellerData?.playerName ?? I18n.T("ui_gov", "政府")), ("tile", BargainData.tileName), ("rent", rent)));
+                        BroadcastMsg(I18n.T("broadcast_bargain_lose2", $"Bargain失败，{buyerData.playerName} 向 {sellerData?.playerName ?? "政府"} 支付其房产租金{rent}元", ("buyer", buyerData.playerName), ("seller", sellerData?.playerName ?? I18n.T("ui_gov", "政府")), ("rent", rent)));
                     }
                 }
             }

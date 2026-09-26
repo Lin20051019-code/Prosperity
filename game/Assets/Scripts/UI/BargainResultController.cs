@@ -23,9 +23,6 @@ namespace SheNicest.UI
 
             if (resultText != null)
             {
-                string tileName = DiceRollController.BargainData.tileName;
-                if (string.IsNullOrEmpty(tileName)) tileName = I18n.T("ui_property", "房产");
-
                 string role = BargainState.isAIVsAI
                     ? ""
                     : (BargainState.isPlayerBuyer ? I18n.T("ui_role_buyer", "（你是买方）") : I18n.T("ui_role_seller", "（你是卖方）"));
@@ -33,10 +30,11 @@ namespace SheNicest.UI
                 // v3移植：收尾台词（成交/失败的现场感），无台词时退回纯结果文案
                 string quote = string.IsNullOrEmpty(BargainState.resultLine) ? "" : $"「{BargainState.resultLine}」\n";
 
+                // 2026-09-26：房产名用"卖方的房产"表示（内部地块名Tile_Rx不面向玩家；原属信息已并入名称）
                 if (BargainState.resultSuccess)
-                    resultText.text = I18n.T("result_success_line", $"{quote}交易成功！\n{BargainState.buyerName} 以 {BargainState.resultFinalPrice} 元\n购得 {tileName}（原属 {BargainState.sellerName}）{role}", ("quote", quote), ("buyer", BargainState.buyerName), ("price", BargainState.resultFinalPrice), ("tile", tileName), ("seller", BargainState.sellerName), ("role", role));
+                    resultText.text = I18n.T("result_success_line", $"{quote}交易成功！\n{BargainState.buyerName} 以 {BargainState.resultFinalPrice} 元\n购得 {BargainState.sellerName}的房产{role}", ("quote", quote), ("buyer", BargainState.buyerName), ("price", BargainState.resultFinalPrice), ("seller", BargainState.sellerName), ("role", role));
                 else
-                    resultText.text = I18n.T("result_fail_line", $"{quote}交易失败\n{BargainState.buyerName} 需向 {BargainState.sellerName}\n支付 {tileName} 的租金{role}", ("quote", quote), ("buyer", BargainState.buyerName), ("seller", BargainState.sellerName), ("tile", tileName), ("role", role));
+                    resultText.text = I18n.T("result_fail_line", $"{quote}交易失败\n{BargainState.buyerName} 需向 {BargainState.sellerName}\n支付其房产的租金{role}", ("quote", quote), ("buyer", BargainState.buyerName), ("seller", BargainState.sellerName), ("role", role));
             }
         }
 
